@@ -1,0 +1,92 @@
+---
+description: IPC iletişim ve shared types katı kuralları - kanal adlandırma, tip güvenliği, preload bridge
+globs: src/preload/**/*.ts, src/shared/**/*.ts
+alwaysApply: false
+---
+
+# IPC İletişim ve Shared Types Katı Kuralları
+
+## 1. Kanal Adlandırma — Zorunlu Format
+
+IPC kanalları `{modul}:{aksiyon}` formatında isimlendirilir:
+
+```
+✅ auth:login, auth:get-all, document:create, document:search
+❌ getUsers, createDoc, AUTH_LOGIN, auth/login
+```
+
+- Modül adı: kebab-case, tekil (`auth`, `document`, `report`)
+- Aksiyon adı: kebab-case, fiil ile başlar (`get-all`, `create`, `update`, `delete`, `search`)
+- Standart CRUD kanalları: `{modul}:get-all`, `{modul}:get-by-id`, `{modul}:create`, `{modul}:update`, `{modul}:delete`
+
+## 2. Tip Güvenliği — Katı
+
+- Frontend ve backend arasındaki **tüm** veri tipleri `src/shared/types/` altında tanımlanır.
+- **YASAK**: Frontend veya backend'de ayrı ayrı aynı tipi tanımlamak.
+- **YASAK**: IPC üzerinden `any` tipinde veri göndermek veya almak.
+- Her modül için ayrı tip dosyası: `src/shared/types/{modul}.types.ts`
+- Tüm tipler `src/shared/types/index.ts` üzerinden dışa aktarılır (barrel export).
+
+```typescript
+// ✅ DOĞRU — shared/types/document.types.ts
+export interface Document extends BaseEntity {
+  title: string
+  content: string
+  is_archived: boolean
+}
+export interface CreateDocumentRequest {
+  title: string
+  content: string
+}
+
+// ❌ YANLIŞ — frontend içinde ayrı tip tanımı
+// src/renderer/src/types/document.ts ← YASAK
+```
+
+## 3. ServiceResponse Formatı — Zorunlu
+
+Tüm IPC yanıtları `ServiceResponse<T>` formatında döner, istisnasız:
+
+```typescript
+interface ServiceResponse<T = null> {
+  success: boolean
+  data: T
+  message: string
+  statusCode: number
+}
+```
+
+- **YASAK**: IPC'den ham veri döndürmek (string, number, array direkt olarak).
+- **YASAK**: Farklı yanıt formatı kullanmak.
+- Başarılı: `{ success: true, data: T, message: string, statusCode: 200|201 }`
+- Hata: `{ success: false, data: null, message: string, statusCode: 4xx|5xx }`
+
+## 4. Preload Bridge — Katı
+
+- Preload script **yalnızca** aşağıdaki generic fonksiyonları expose eder:
+  - `invoke(channel, data?)` — IPC üzerinden backend'e istek gönderir (request-response).
+  - `on(channel, callback)` — Backend'den gelen olayları dinler (push notification, progress vb.).
+  - `off(channel, callback)` — Olay dinlemeyi bırakır (memory leak önlemi).
+- **YASAK**: Preload içinde iş mantığı yazmak.
+- **YASAK**: Preload'da Node.js API'lerini (fs, path, child_process) expose etmek.
+- **YASAK**: `contextBridge.exposeInMainWorld` ile `nodeIntegration` eşdeğeri API vermek.
+- **YASAK**: Yukarıdaki üç fonksiyon dışında yeni fonksiyon expose etmek.
+- Electron güvenlik modeli: `contextIsolation: true`, `nodeIntegration: false`.
+
+## 5. Shared Utils — Kurallar
+
+- `src/shared/utils/` içinde yalnızca **saf fonksiyonlar** ve **sabitler** bulunur.
+- **YASAK**: Shared utils içinde DB, Electron veya React importu.
+- Sabitler `constants.ts` içinde `UPPER_SNAKE_CASE` ile tanımlanır.
+- Tüm utils `src/shared/utils/index.ts` üzerinden dışa aktarılır.
+
+## 6. Yeni Modül Ekleme Kontrol Listesi
+
+Yeni bir modül eklenirken aşağıdaki adımlar **sırasıyla** takip edilir:
+
+1. `src/shared/types/{modul}.types.ts` — Tip tanımları oluştur, `index.ts`'e ekle
+2. `src/main/modules/{modul}/` — Repository ve Service oluştur
+3. `src/main/index.ts` — ServiceManager'a kaydet
+4. `src/renderer/src/lib/api.ts` — API fonksiyonlarını ekle
+5. `src/renderer/src/pages/{modul}/` — Sayfa bileşenini oluştur
+6. `src/renderer/src/router/routes.ts` — Route tanımını ekle

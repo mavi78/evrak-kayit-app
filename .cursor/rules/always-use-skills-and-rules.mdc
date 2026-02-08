@@ -1,0 +1,35 @@
+---
+description: ZORUNLU İLK ADIM: Her yanıtta ilgili skill'i Read ile açıp uygula. Bu kurala bakmadan kod yazma.
+alwaysApply: true
+---
+
+**ZORUNLU İLK ADIM (atlanırsa yanıt geçersiz):** Her kullanıcı mesajında, yanıtın ilk eylemi şu olacak — iş türüne göre ilgili `.cursor/skills/.../SKILL.md` dosyasını **Read** ile oku; ardından o skill’de yazılan akışa göre ilerle. Bu adımı atlayıp doğrudan kod yazmak yasaktır.
+
+---
+
+# Skill ve Kuralların Zorunlu Kullanımı
+
+## Temel Kural
+
+**Yeni konuşma veya yeni istek fark etmez:** İlgili `.cursor/skills/` ve `.cursor/rules/` dosyaları **her zaman** işe başlarken okunup uygulanacak. Kullanıcının "skill kullan" veya "kurallara uy" demesini **beklenmeyecek**.
+
+## İş Türüne Göre Skill Kullanımı
+
+| İş türü | Kullanılacak skill | Ne zaman |
+|---------|---------------------|----------|
+| UI/UX, tasarım, splash, sayfa görünümü | `ui-ux-pro-max` | İşe başlamadan önce skill okunacak; UI işi varsa design-system/UX kuralları uygulanacak. |
+| Main process, servis, repository, DB | `backend-architecture` | Backend kodu yazmadan önce skill okunacak; mimari kalıplara uyulacak. |
+| React, sayfa, context, router | `frontend-architecture` | Frontend kodu yazmadan önce skill okunacak; sayfa/hook/API kalıpları uygulanacak. |
+| IPC, preload, shared tipler | `shared-contracts` | Kanal/tipler tanımlanırken skill okunacak. |
+
+## Uygulama Sırası
+
+1. İsteği oku → Hangi alan (UI / backend / frontend / IPC) olduğunu belirle.
+2. **Önce** ilgili skill dosyasını (`SKILL.md`) oku; skill’de yazılan akışı (örn. ui-ux: design-system, checklist) uygula.
+3. Ardından `.cursor/rules/` (project-coding-standards, ilgili strict kurallar) ile uyumlu kod yaz.
+4. Doğrulama: TypeCheck ve Lint (project-coding-standards’taki gibi) mutlaka çalıştır.
+
+## Yasak
+
+- "Kullanıcı söylemediği için skill/kural kullanmadım" **kabul edilmez**.
+- Skill veya kuralı yalnızca kullanıcı açıkça istediğinde devreye sokmak **yasaktır**; varsayılan davranış her zaman uyumdur.

@@ -1,0 +1,105 @@
+---
+description: Electron Main Process (Backend) katı geliştirme kuralları - modül yapısı, veritabanı, hata yönetimi, güvenlik
+globs: src/main/**/*.ts
+alwaysApply: false
+---
+
+# Backend Katı Kurallar (Electron Main Process)
+
+## 1. Modül Yapısı — Zorunlu
+
+Her yeni modül `src/main/modules/{modul-adi}/` altında oluşturulur ve şu dosyaları **zorunlu** içerir:
+
+```
+src/main/modules/{modul-adi}/
+  {modul-adi}.repository.ts   # Veri erişim katmanı
+  {modul-adi}.service.ts      # İş mantığı katmanı
+```
+
+- Repository → `BaseRepository<T>` sınıfından türetilir.
+- Service → `BaseService<T>` sınıfından türetilir.
+- **YASAK**: Repository veya Service dışında doğrudan DB erişimi yapılmaz.
+- **YASAK**: Servis dışında iş mantığı yazılmaz.
+- **YASAK**: Modüller arası doğrudan repository erişimi — servisten servise çağrı yapılır.
+
+## 2. Repository Kuralları
+
+```typescript
+// ✅ DOĞRU — Her repository BaseRepository'den türer
+export class DocumentRepository extends BaseRepository<Document> {
+  protected getTableName(): string { return 'documents' }
+  protected getTableSchemas(): readonly string[] { return [SCHEMA] }
+  protected getBooleanColumns(): readonly string[] { return ['is_archived'] }
+}
+
+// ❌ YANLIŞ — Doğrudan DB erişimi
+const db = Database.getInstance().getConnection()
+db.prepare('SELECT * FROM users').all()
+```
+
+- `getTableName()`, `getTableSchemas()` **zorunlu** tanımlanır.
+- Boolean alanlar varsa `getBooleanColumns()` **zorunlu** override edilir.
+- Tüm DB sorguları `safeExecute()` veya `safeTransaction()` içinde çalıştırılır.
+- Raw SQL dışında ORM/Query Builder kullanılmaz (proje standardı better-sqlite3 raw SQL).
+- SQL injection'a karşı **her zaman** parameterized query (`?` placeholder) kullanılır.
+
+## 3. Service Kuralları
+
+- `getModuleName()` ve `getChannelPrefix()` **zorunlu** tanımlanır.
+- Standart CRUD override edilecekse `handleCreate`, `handleUpdate`, `handleDelete` kullanılır.
+- Özel IPC kanalları `getCustomHandlers()` ile eklenir.
+- **Validation serviste yapılır, repository'de değil.**
+- State değiştiren her işlem (create, update, delete) **audit log** kaydı oluşturur.
+
+```typescript
+// ✅ DOĞRU — Validasyon serviste
+protected override async handleCreate(data: unknown): Promise<ServiceResponse<unknown>> {
+  const input = data as CreateDocumentRequest
+  if (!input.title?.trim()) throw AppError.badRequest('Başlık zorunludur')
+  // ...
+}
+
+// ❌ YANLIŞ — Validasyon repository'de
+create(data: Record<string, unknown>): Document {
+  if (!data.title) throw new Error('Title required') // YASAK
+}
+```
+
+## 4. Hata Yönetimi — Katı
+
+- **YASAK**: `throw new Error()` — Her zaman `AppError` kullanılır.
+- **YASAK**: `console.log/warn/error` — Her zaman `Logger` kullanılır.
+- **YASAK**: Hataları yutmak (`catch {}` veya `catch { /* ignore */ }`).
+- AppError status kodları: `badRequest(400)`, `unauthorized(401)`, `forbidden(403)`, `notFound(404)`, `conflict(409)`, `internal(500)`, `busy(503)`.
+- Tüm handler'lar `ServiceResponse<T>` formatında yanıt döner.
+
+```typescript
+// ✅ DOĞRU
+throw AppError.badRequest('Geçersiz veri')
+this.logger.error('İşlem başarısız', error, this.getModuleName())
+
+// ❌ YANLIŞ
+throw new Error('Invalid data')
+console.error('Operation failed')
+```
+
+## 5. Güvenlik Kuralları
+
+- Şifreler **asla** düz metin saklanmaz — `bcryptjs` ile hashlenr (SALT_ROUNDS = 10).
+- Yanıtlarda şifre alanı **asla** döndürülmez — `stripPassword()` pattern'i uygulanır.
+- Rol hiyerarşisi her state-changing işlemde kontrol edilir.
+- `ServiceManager` üzerinden kaydedilmeyen servis IPC'ye bağlanamaz.
+
+## 6. Dosya Başlık Bloğu — Zorunlu
+
+Her `.ts` dosyası açıklama bloğu ile başlar:
+
+```typescript
+// ============================================================
+// DosyaAdı - Kısa açıklama (Türkçe)
+//
+// Sorumlulukları:
+// 1. ...
+// 2. ...
+// ============================================================
+```

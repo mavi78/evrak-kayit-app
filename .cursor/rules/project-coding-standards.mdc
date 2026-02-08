@@ -1,0 +1,64 @@
+---
+description: Proje geneli kod yazma standartları - isimlendirme, mimari, iletişim ve iş akışı kuralları
+alwaysApply: true
+---
+
+# Proje Kod Yazma Standartları
+
+## 1. İsimlendirme Kuralları
+
+Tüm isimler İngilizce, tutarlı ve anlamlı olmalıdır.
+
+| Öğe | Kural | Örnek |
+|-----|-------|-------|
+| Dosya (modül) | camelCase veya kebab-case | `userService.ts`, `auth-helper.ts` |
+| Klasör | kebab-case | `user-management/`, `shared-utils/` |
+| Değişken | camelCase | `userName`, `isActive` |
+| Sabit | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT`, `API_BASE_URL` |
+| Fonksiyon | camelCase, fiil ile başlar | `getUserById()`, `calculateTotal()` |
+| Sınıf | PascalCase | `UserService`, `DocumentParser` |
+| Interface/Type | PascalCase, "I" prefix yok | `UserProfile`, `ApiResponse` |
+| Enum | PascalCase, üyeleri UPPER_SNAKE | `enum Status { ACTIVE, INACTIVE }` |
+
+## 2. JSDoc Açıklamaları Türkçe Yazılacak
+
+```typescript
+/**
+ * Kullanıcıyı veritabanından ID ile getirir.
+ * @param id - Kullanıcının benzersiz kimliği
+ * @returns Bulunan kullanıcı nesnesi veya null
+ * @throws {DatabaseError} Veritabanı bağlantı hatası durumunda
+ */
+function getUserById(id: string): Promise<User | null> {
+  // ...
+}
+```
+
+## 3. Mimari Prensipler
+
+- **OOP & Modüler**: Kodlar sınıf tabanlı, modüler ve katmanlı mimaride yazılacak.
+- **Single Responsibility**: Her fonksiyon/sınıf yalnızca tek bir işten sorumlu olacak.
+- **DRY (Don't Repeat Yourself)**: Aynı işi yapan birden fazla fonksiyon, sınıf veya modül yazılmayacak. Tekrar eden mantık ortak bir yere çıkarılacak.
+- **Optimizasyon**: Gereksiz döngü, hesaplama ve bellek kullanımından kaçınılacak.
+
+## 4. Kullanıcı İletişim Dili
+
+Kullanıcı ile **her zaman Türkçe** konuşulacak. Kod içi isimler İngilizce kalacak, ancak tüm açıklamalar, commit mesajları ve kullanıcıya yönelik çıktılar Türkçe olacak.
+
+## 5. İş Akışı — Önce Analiz, Sonra Onay
+
+**İlk adım (atlanırsa iş geçersiz):** İlgili skill dosyasını (`.cursor/skills/.../SKILL.md`) **Read** ile aç ve uygula. Bu yapılmadan analiz/kod yazılmaz.
+
+Bir istek geldiğinde şu adımlar izlenecek:
+
+1. **Skill ve Kurallar (Zorunlu)**: İş türüne göre ilgili `.cursor/skills/` (ui-ux-pro-max, backend-architecture, frontend-architecture, shared-contracts) dosyası **Read** ile okunup uygulanır. Kullanıcı söylemeden yapılır; detay `always-use-skills-and-rules.mdc`.
+2. **Proje Analizi**: Mevcut kod tabanı ve ilgili dosyalar incelenir.
+3. **Netleştirme**: Yapılacak iş net değilse kullanıcıya seçenekler sunularak netleştirilir.
+4. **Onay**: Yapılacak değişiklikler kısaca özetlenip kullanıcıdan onay alınır.
+5. **Uygulama**: Onay alındıktan sonra kodlama başlar.
+6. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
+   - **TypeCheck**: `npx tsc --noEmit` komutu çalıştırılarak tip hataları kontrol edilecek.
+   - **Lint**: `npx eslint .` komutu çalıştırılarak lint hataları kontrol edilecek.
+   - Hata bulunursa düzeltilmeden işlem tamamlanmış sayılmayacak.
+
+Belirsiz veya birden fazla yaklaşım mümkünse, AskQuestion ile seçenekler sunulacak.

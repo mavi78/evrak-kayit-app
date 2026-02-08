@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+    />
+    <title>Deniz Kuvvetleri Evrak Kayıt - Yükleniyor</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      :root {
+        --deniz: #1e3a8a;
+        --deniz-light: #385d8c;
+        --deniz-dark: #0a1629;
+        --tsk-red: #c41e3a;
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --white: #ffffff;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        min-height: 100vh;
+        font-family:
+          'Segoe UI',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Roboto',
+          sans-serif;
+        color: var(--text);
+        background: linear-gradient(
+          165deg,
+          var(--deniz-dark) 0%,
+          var(--deniz) 50%,
+          var(--deniz-light) 100%
+        );
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 1.5rem;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-radius: 8px;
+        margin-bottom: 0.25rem;
+        background: rgba(0, 0, 0, 0.15);
+      }
+      .badge svg {
+        width: 28px;
+        height: 28px;
+        fill: var(--white);
+        opacity: 0.95;
+      }
+      .org {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.85);
+        margin: 0;
+      }
+      .title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--white);
+        letter-spacing: 0.02em;
+      }
+      .sub {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin: 0;
+      }
+      .progress-wrap {
+        width: 100%;
+        max-width: 240px;
+        height: 4px;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+      }
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background: var(--tsk-red);
+        border-radius: 2px;
+        transition: width 0.35s ease-out;
+      }
+      .loader {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 0.5rem;
+      }
+      .loader span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--white);
+        animation: bounce 1.2s ease-in-out infinite both;
+      }
+      .loader span:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .loader span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .loader span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: scale(0.6);
+          opacity: 0.5;
+        }
+        40% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .loader span {
+          animation: none;
+          opacity: 0.7;
+        }
+      }
+      .status {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin: 0;
+        min-height: 1.2rem;
+        transition: opacity 0.2s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="badge" aria-hidden="true">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path
+          d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l6.9 3.45v6.74L12 18.82 5.1 14.37V7.63L12 4.18z"
+        />
+      </svg>
+    </div>
+    <p class="org">Deniz Kuvvetleri Komutanlığı</p>
+    <h1 class="title">Evrak Kayıt Sistemi</h1>
+    <p class="sub">Başlatılıyor...</p>
+    <div class="progress-wrap">
+      <div
+        class="progress-bar"
+        id="progressBar"
+        role="progressbar"
+        aria-valuenow="0"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      ></div>
+    </div>
+    <div class="loader" aria-hidden="true"><span></span><span></span><span></span></div>
+    <p class="status" id="status" aria-live="polite">Yükleniyor...</p>
+    <script>
+      ;(function () {
+        if (typeof window.api === 'undefined') return
+        var statusEl = document.getElementById('status')
+        var progressBar = document.getElementById('progressBar')
+        function setStatus(message) {
+          if (statusEl && message && typeof message === 'string') {
+            statusEl.textContent = message
+          }
+        }
+        function setProgress(percent) {
+          if (progressBar) {
+            progressBar.style.width = Math.min(100, Math.max(0, percent)) + '%'
+            progressBar.setAttribute('aria-valuenow', Math.round(percent))
+          }
+        }
+        window.api.on('app:loading-progress', function (arg) {
+          var payload = arg && typeof arg === 'object' ? arg : { message: null }
+          var msg = payload.message
+          if (msg) setStatus(msg)
+          if (payload.step === 'app') setProgress(10)
+          if (payload.step === 'database' && payload.status === 'done') setProgress(40)
+          if (payload.step === 'services' && payload.status === 'started') setProgress(50)
+          if (payload.step === 'services' && payload.status === 'done') setProgress(100)
+        })
+        window.api.on('app:backend-ready', function () {
+          setStatus('Hazır.')
+          setProgress(100)
+        })
+      })()
+    </script>
+  </body>
+</html>

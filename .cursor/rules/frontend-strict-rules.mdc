@@ -1,0 +1,124 @@
+---
+description: React Renderer (Frontend) katı geliştirme kuralları - bileşen yapısı, state yönetimi, API katmanı, UI standartları
+globs: src/renderer/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Katı Kurallar (React Renderer)
+
+## 1. Klasör Yapısı — Zorunlu
+
+```
+src/renderer/src/
+  components/     # Tekrar kullanılabilir bileşenler (layout/, common/, vb.)
+  context/        # Global state (Context + useReducer)
+  │   index.ts           # Barrel: AuthProvider, AuthContext, AuthContextValue
+  │   AuthContext.tsx    # AuthProvider bileşeni
+  │   auth-context-def.ts # Context tanımı (createContext, reducer, tipler)
+  hooks/          # Custom hook'lar (useAuth, useDocument, vb.)
+  lib/            # Yardımcı kütüphaneler (api.ts, notifications.ts)
+  pages/          # Sayfa bileşenleri — her sayfa kendi klasöründe
+  router/         # Route tanımları ve guard'lar
+  theme/          # Mantine tema yapılandırması
+```
+
+- Context import'ları **yalnızca** `@renderer/context` barrel'inden yapılır (örn. `import { AuthProvider, useAuth } from '@renderer/context'`). Context tanımı `auth-context-def.ts` içindedir; `AuthContext.ts` adı çözümleyici karışıklığına yol açtığı için kullanılmaz.
+
+- Yeni sayfa → `pages/{sayfa-adi}/` klasöründe `{SayfaAdi}Page.tsx` dosyası.
+- Tekrar kullanılabilir bileşen → `components/` altında uygun alt klasör.
+- **YASAK**: Sayfa bileşeni `components/` içine konulmaz.
+- **YASAK**: Tekrar kullanılabilir bileşen `pages/` içinde kalır.
+
+## 2. Bileşen Kuralları
+
+- **Sadece fonksiyonel bileşen** kullanılır — class component YASAK.
+- Her bileşen açık `React.JSX.Element` dönüş tipi belirtir.
+- Props interface'i bileşen dosyasının üstünde tanımlanır.
+- **YASAK**: Bileşen içinde inline style — Mantine `sx`, `style` prop veya CSS modülleri kullanılır.
+- **YASAK**: `document.getElementById`, `querySelector` vb. doğrudan DOM manipülasyonu.
+
+```typescript
+// ✅ DOĞRU
+interface UserCardProps {
+  user: UserWithoutPassword
+  onEdit: (id: number) => void
+}
+
+export function UserCard({ user, onEdit }: UserCardProps): React.JSX.Element {
+  return <Card shadow="sm" padding="lg">...</Card>
+}
+
+// ❌ YANLIŞ — class component, inline style, DOM erişimi
+class UserCard extends React.Component { ... }
+<div style={{ color: 'red' }}>...</div>
+document.getElementById('root')!.innerHTML = '...'
+```
+
+## 3. State Yönetimi — Katı
+
+| Kapsam | Yöntem | Örnek |
+|--------|--------|-------|
+| Global (kullanıcı, tema) | Context + useReducer | `AuthContext` |
+| Sayfa düzeyi | useState / useReducer | Form state, tablo filtreleri |
+| Server state | API çağrısı + local state | `authApi.getAll()` |
+
+- **YASAK**: Global state için `useState` kullanmak — `useReducer` kullanılır.
+- **YASAK**: Props drilling (3+ seviye) — Context veya composition pattern kullanılır.
+- **YASAK**: State içinde türetilebilir veri saklamak (computed değerler `useMemo` ile hesaplanır).
+- Context oluşturulurken `createContext<T | null>(null)` pattern'i uygulanır.
+- Her context için karşılık gelen custom hook yazılır (`useAuth`, `useDocument`, vb.).
+
+## 4. API Katmanı — Katı
+
+- Tüm backend çağrıları `lib/api.ts` üzerinden yapılır.
+- **YASAK**: Bileşen içinde doğrudan `window.api.invoke()` çağrısı.
+- Her API fonksiyonu `ServiceResponse<T>` tipinde döner.
+- Her API çağrısından sonra `response.success` kontrolü **zorunlu**.
+
+```typescript
+// ✅ DOĞRU — api.ts üzerinden tipli çağrı
+const response = await authApi.getAll()
+if (!response.success) {
+  showErrorNotification(response.message)
+  return
+}
+const users = response.data
+
+// ❌ YANLIŞ — doğrudan IPC çağrısı, hata kontrolü yok
+const data = await window.api.invoke('auth:get-all')
+setUsers(data.data) // success kontrolü yok!
+```
+
+## 5. UI Standartları — Katı
+
+- UI bileşenleri **sadece Mantine** kütüphanesinden kullanılır.
+- İkonlar **sadece `@tabler/icons-react`** kütüphanesinden kullanılır.
+- **YASAK**: Ham HTML elementleri (button, input, select, table) — Mantine karşılığı kullanılır.
+- **YASAK**: Üçüncü parti UI kütüphanesi eklemek (Bootstrap, Ant Design, MUI vb.).
+- Bildirimler `@mantine/notifications` ile gösterilir — `alert()` veya `window.confirm()` YASAK.
+- Formlar `@mantine/form` ile yönetilir.
+
+```typescript
+// ✅ DOĞRU
+import { Button, TextInput, Table } from '@mantine/core'
+import { IconPlus } from '@tabler/icons-react'
+
+// ❌ YANLIŞ
+<button onClick={handleClick}>Ekle</button>
+<input type="text" value={name} />
+alert('İşlem başarılı!')
+```
+
+## 6. Router ve Yetkilendirme — Katı
+
+- Her korunan sayfa `ProtectedRoute` ile sarmalanır.
+- Route tanımları `router/routes.ts` dosyasında merkezi tutulur.
+- **YASAK**: Sayfa bileşeni içinde `Navigate` veya `useNavigate` ile yetki kontrolü — `ProtectedRoute` kullanılır.
+- `pageKey` ve `minimumRole` her route config'de tanımlanır.
+
+## 7. Hook Kuralları
+
+- Tekrar eden mantık custom hook'a çıkarılır.
+- Hook isimleri `use` prefix'i ile başlar.
+- Hook'lar `hooks/` klasöründe tutulur.
+- **YASAK**: `useEffect` içinde doğrudan API çağrısı — custom hook üzerinden yapılır.
