@@ -9,14 +9,15 @@ export interface BaseEntity {
   updated_at: string
 }
 
-/** Kullanıcı rolleri */
-export type UserRole = 'superadmin' | 'admin' | 'user'
+/** Kullanıcı rolleri - system en üst yetki, silinemez ve kaldırılamaz */
+export type UserRole = 'system' | 'superadmin' | 'admin' | 'user'
 
 /** Rol hiyerarşisi - sayısal değer yükseldikçe yetki artar */
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   user: 1,
   admin: 2,
-  superadmin: 3
+  superadmin: 3,
+  system: 4
 }
 
 /** Backend servis yanıt formatı - tüm IPC çağrıları bu formatta döner */

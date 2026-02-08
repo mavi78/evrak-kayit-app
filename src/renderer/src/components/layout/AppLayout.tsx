@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AppShell } from '@mantine/core'
+import { useAuth } from '@renderer/hooks/useAuth'
 import { AppHeader } from './AppHeader'
 import { AppSidebar } from './AppSidebar'
 
@@ -15,7 +16,11 @@ const SIDEBAR_WIDTH_COLLAPSED = 72
 
 export function AppLayout(): React.JSX.Element {
   const location = useLocation()
-  const showSidebar = location.pathname !== '/login' && location.pathname !== '/'
+  const { state } = useAuth()
+  const showSidebar =
+    location.pathname !== '/login' &&
+    location.pathname !== '/' &&
+    !state.user?.must_change_password
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const navbarWidth = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
 

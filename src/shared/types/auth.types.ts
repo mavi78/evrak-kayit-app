@@ -22,6 +22,8 @@ export interface User extends BaseEntity {
   rutbe: string
   role: UserRole
   is_active: boolean
+  /** Başkası şifreyi değiştirdiyse true; kullanıcı ilk girişte şifre değiştirmek zorunda */
+  must_change_password: boolean
 }
 
 /** Şifre hariç kullanıcı bilgisi - frontend'e gönderilir */
@@ -65,9 +67,14 @@ export interface UpdateUserRequest {
 }
 
 export interface ChangePasswordRequest {
+  /** Şifresi değiştirilecek kullanıcı */
   user_id: number
-  old_password: string
+  /** Yeni şifre (zorunlu) */
   new_password: string
+  /** İşlemi yapan kullanıcı (zorunlu) */
+  changed_by: number
+  /** Kendi şifresini değiştirirken mevcut şifre (user_id === changed_by ise zorunlu) */
+  old_password?: string
 }
 
 export interface SetPermissionRequest {

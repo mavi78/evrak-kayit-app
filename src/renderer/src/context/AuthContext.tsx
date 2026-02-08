@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   const hasPageAccess = useCallback(
     (pageKey: PageKey): boolean => {
       if (!state.user) return false
-      if (state.user.role === 'superadmin') return true
+      if (state.user.role === 'system' || state.user.role === 'superadmin') return true
       if (PUBLIC_PAGES.includes(pageKey)) return true
       if (SUPERADMIN_ONLY_PAGES.includes(pageKey)) return false
       const permission = state.permissions.find((p) => p.page_key === pageKey)

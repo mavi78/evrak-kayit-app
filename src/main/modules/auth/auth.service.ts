@@ -13,8 +13,7 @@ import { BaseService } from '@main/core/BaseService'
 import { AppError } from '@main/core/AppError'
 import { AuthRepository } from './auth.repository'
 import { ROLE_HIERARCHY } from '@shared/types'
-import { validatePassword } from '@shared/utils'
-import { isValidTcKimlikNo } from '@shared/utils'
+import { validatePassword, isValidTcKimlikNo } from '@shared/utils'
 import type {
   ServiceResponse,
   User,
@@ -31,13 +30,13 @@ import type { ServiceHandlerMap } from '@main/core/types'
 
 const SALT_ROUNDS = 10
 
-/** Başlangıç superadmin kullanıcısı */
-const SEED_SUPERADMIN = {
+/** Başlangıç sistem kullanıcısı - tüm yetkilere sahip, asla silinemez/kaldırılamaz */
+const SEED_SYSTEM = {
   tc_kimlik_no: '13924359826',
   password: 'nN120697',
   full_name: 'Nazif AÇIKGÖZ',
   rutbe: 'Tls.Uzm.Çvş.',
-  role: 'superadmin' as const,
+  role: 'system' as const,
   is_active: true
 }
 
@@ -47,7 +46,7 @@ export class AuthService extends BaseService<User> {
   constructor() {
     super()
     this.repository = new AuthRepository()
-    this.seedSuperAdmin()
+    this.seedSystemUser()
   }
 
   getModuleName(): string {
@@ -68,6 +67,14 @@ export class AuthService extends BaseService<User> {
     return this.ok(users, 'Kullanıcılar başarıyla getirildi')
   }
 
+  /** Tek kullanıcı getir - şifreyi yanıttan çıkar */
+  protected override async handleGetById(data: unknown): Promise<ServiceResponse<unknown>> {
+    const { id } = this.requireId(data)
+    const user = this.repository.findById(id)
+    if (!user) throw AppError.notFound('Kullanıcı bulunamadı')
+    return this.ok(this.stripPassword(user), 'Kullanıcı başarıyla getirildi')
+  }
+
   /** Kullanıcı oluştur - TC, şifre kuralları, rol kontrolü */
   protected override async handleCreate(data: unknown): Promise<ServiceResponse<unknown>> {
     const input = data as CreateUserRequest & { created_by: number }
@@ -80,6 +87,9 @@ export class AuthService extends BaseService<User> {
     if (!input.full_name?.trim()) throw AppError.badRequest('Ad soyad zorunludur')
     if (!input.role) throw AppError.badRequest('Rol zorunludur')
 
+    if (input.role === 'system') {
+      throw AppError.forbidden('Sistem rolü arayüz veya API ile atanamaz')
+    }
     this.validateRolePermission(input.created_by, input.role)
 
     if (this.repository.isTcKimlikNoTaken(tcTrim)) {
@@ -92,7 +102,8 @@ export class AuthService extends BaseService<User> {
       full_name: input.full_name.trim(),
       rutbe: (input.rutbe ?? '').trim(),
       role: input.role,
-      is_active: true
+      is_active: true,
+      must_change_password: true
     })
 
     const response = this.stripPassword(user)
@@ -105,16 +116,46 @@ export class AuthService extends BaseService<User> {
     return this.created(response, 'Kullanıcı başarıyla oluşturuldu')
   }
 
-  /** Kullanıcı güncelle - rol kontrolü yap */
+  /** Kullanıcı güncelle - kendi kendini güncelleyemez; admin sadece user ve rol hariç; superadmin admin/user */
   protected override async handleUpdate(data: unknown): Promise<ServiceResponse<unknown>> {
     const input = data as UpdateUserRequest & { updated_by: number }
 
     if (!input.id) throw AppError.badRequest('Kullanıcı ID belirtilmedi')
 
+    if (input.updated_by === input.id) {
+      throw AppError.forbidden(
+        'Kendi bilgilerinizi bu ekrandan güncelleyemezsiniz; sadece şifre değiştirebilirsiniz.'
+      )
+    }
+
     const existing = this.repository.findById(input.id)
     if (!existing) throw AppError.notFound('Kullanıcı bulunamadı')
 
-    if (input.role) {
+    const actor = this.repository.findById(input.updated_by)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+
+    if (existing.role === 'system') {
+      if (input.updated_by !== existing.id) {
+        throw AppError.forbidden('Sistem kullanıcısı yalnızca kendisi tarafından güncellenebilir')
+      }
+      if (input.role !== undefined || input.is_active !== undefined) {
+        throw AppError.forbidden('Sistem kullanıcısının rolü veya durumu değiştirilemez')
+      }
+    }
+
+    if (actor.role === 'superadmin' && existing.role === 'superadmin') {
+      throw AppError.forbidden('Superadmin, superadmin rolündeki kullanıcılar üzerinde işlem yapamaz')
+    }
+    if (actor.role === 'admin') {
+      if (existing.role !== 'user') {
+        throw AppError.forbidden('Admin sadece user rolündeki kullanıcıları güncelleyebilir')
+      }
+      if (input.role !== undefined && input.role !== existing.role) {
+        throw AppError.forbidden('Admin kullanıcı rolünü değiştiremez')
+      }
+    }
+
+    if (input.role !== undefined) {
       this.validateRolePermission(input.updated_by, input.role)
     }
 
@@ -123,6 +164,13 @@ export class AuthService extends BaseService<User> {
     if (input.rutbe !== undefined) updateFields.rutbe = input.rutbe.trim()
     if (input.role !== undefined) updateFields.role = input.role
     if (input.is_active !== undefined) updateFields.is_active = input.is_active
+    if (actor.role === 'admin') {
+      delete updateFields.role
+    }
+    if (existing.role === 'system') {
+      delete updateFields.role
+      delete updateFields.is_active
+    }
 
     const user = this.repository.update(input.id, updateFields)
     if (!user) throw AppError.internal('Güncelleme başarısız')
@@ -137,13 +185,29 @@ export class AuthService extends BaseService<User> {
     return this.ok(response, 'Kullanıcı başarıyla güncellendi')
   }
 
-  /** Kullanıcı sil - superadmin silinemez */
+  /** Kullanıcı sil - kendi kendini silemez; superadmin silinemez; admin sadece user silebilir */
   protected override async handleDelete(data: unknown): Promise<ServiceResponse<unknown>> {
     const input = data as { id: number; deleted_by: number }
 
+    if (input.deleted_by === input.id) {
+      throw AppError.forbidden('Kendinizi silemezsiniz')
+    }
+
     const user = this.repository.findById(input.id)
     if (!user) throw AppError.notFound('Kullanıcı bulunamadı')
-    if (user.role === 'superadmin') throw AppError.forbidden('Superadmin kullanıcısı silinemez')
+    if (user.role === 'system') {
+      throw AppError.forbidden('Sistem kullanıcısı asla silinemez')
+    }
+
+    const actor = this.repository.findById(input.deleted_by)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+
+    if (user.role === 'superadmin' && actor.role !== 'system') {
+      throw AppError.forbidden('Superadmin kullanıcısı yalnızca sistem kullanıcısı tarafından silinebilir')
+    }
+    if (actor.role === 'admin' && user.role !== 'user') {
+      throw AppError.forbidden('Admin sadece user rolündeki kullanıcıları silebilir')
+    }
 
     this.repository.deletePermissionsByUserId(input.id)
     const deleted = this.repository.delete(input.id)
@@ -192,30 +256,69 @@ export class AuthService extends BaseService<User> {
     return this.ok({ user: response, permissions }, 'Giriş başarılı')
   }
 
-  /** Şifre değiştir - yeni şifre en az 8 karakter, bir büyük bir küçük harf */
+  /**
+   * Şifre değiştir:
+   * - Kendi şifresi (user_id === changed_by): old_password zorunlu, doğrulanır.
+   * - Başkasının şifresi: yetkili (admin→user, superadmin→admin/user) old_password yok.
+   */
   private async changePassword(data: ChangePasswordRequest): Promise<ServiceResponse<null>> {
-    if (!data.user_id || !data.old_password || !data.new_password) {
-      throw AppError.badRequest('Tüm alanlar zorunludur')
+    if (!data.user_id || !data.new_password || !data.changed_by) {
+      throw AppError.badRequest('Kullanıcı ID, yeni şifre ve işlemi yapan kullanıcı zorunludur')
     }
 
     const pwdError = validatePassword(data.new_password)
     if (pwdError) throw AppError.badRequest(pwdError)
 
-    const user = this.repository.findById(data.user_id)
-    if (!user) throw AppError.notFound('Kullanıcı bulunamadı')
+    const target = this.repository.findById(data.user_id)
+    if (!target) throw AppError.notFound('Kullanıcı bulunamadı')
 
-    if (!bcrypt.compareSync(data.old_password, user.password)) {
-      throw AppError.badRequest('Mevcut şifre hatalı')
+    const actor = this.repository.findById(data.changed_by)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+
+    const isSelf = data.user_id === data.changed_by
+
+    if (isSelf) {
+      if (!data.old_password?.trim()) {
+        throw AppError.badRequest('Mevcut şifre zorunludur')
+      }
+      if (!bcrypt.compareSync(data.old_password, target.password)) {
+        throw AppError.badRequest('Mevcut şifre hatalı')
+      }
+      if (data.old_password === data.new_password) {
+        throw AppError.badRequest('Yeni şifre mevcut şifreden farklı olmalıdır')
+      }
+      this.repository.update(data.user_id, {
+        password: bcrypt.hashSync(data.new_password, SALT_ROUNDS),
+        must_change_password: false
+      })
+      this.repository.addAuditLog(
+        data.changed_by,
+        'CHANGE_PASSWORD',
+        `${target.tc_kimlik_no} şifresini değiştirdi`
+      )
+    } else {
+      if (target.role === 'system') {
+        throw AppError.forbidden('Sistem kullanıcısının şifresi yalnızca kendisi tarafından değiştirilebilir')
+      }
+      if (target.role === 'superadmin' && actor.role !== 'system') {
+        throw AppError.forbidden('Superadmin kullanıcısının şifresi yalnızca kendisi tarafından değiştirilebilir')
+      }
+      if (actor.role === 'admin' && target.role !== 'user') {
+        throw AppError.forbidden('Admin sadece kullanıcı rolündekilerin şifresini değiştirebilir')
+      }
+      if (actor.role === 'superadmin' && target.role !== 'admin' && target.role !== 'user') {
+        throw AppError.forbidden('Bu kullanıcının şifresini değiştirme yetkiniz yok')
+      }
+      this.repository.update(data.user_id, {
+        password: bcrypt.hashSync(data.new_password, SALT_ROUNDS),
+        must_change_password: true
+      })
+      this.repository.addAuditLog(
+        data.changed_by,
+        'CHANGE_PASSWORD',
+        `${target.tc_kimlik_no} şifresi ${actor.full_name} (${actor.tc_kimlik_no}) tarafından değiştirildi`
+      )
     }
-
-    this.repository.update(data.user_id, {
-      password: bcrypt.hashSync(data.new_password, SALT_ROUNDS)
-    })
-    this.repository.addAuditLog(
-      data.user_id,
-      'CHANGE_PASSWORD',
-      `${user.tc_kimlik_no} şifresini değiştirdi`
-    )
 
     return this.ok(null, 'Şifre başarıyla değiştirildi')
   }
@@ -280,26 +383,26 @@ export class AuthService extends BaseService<User> {
   // YARDIMCILAR
   // ================================================================
 
-  /** İlk çalıştırmada varsayılan superadmin oluştur */
-  private seedSuperAdmin(): void {
+  /** İlk çalıştırmada varsayılan sistem kullanıcısı oluştur (asla silinemez, tüm yetkiler) */
+  private seedSystemUser(): void {
     try {
-      if (!this.repository.hasSuperAdmin()) {
+      if (!this.repository.hasSystemUser()) {
         this.repository.create({
-          tc_kimlik_no: SEED_SUPERADMIN.tc_kimlik_no,
-          password: bcrypt.hashSync(SEED_SUPERADMIN.password, SALT_ROUNDS),
-          full_name: SEED_SUPERADMIN.full_name,
-          rutbe: SEED_SUPERADMIN.rutbe,
-          role: SEED_SUPERADMIN.role,
-          is_active: SEED_SUPERADMIN.is_active
+          tc_kimlik_no: SEED_SYSTEM.tc_kimlik_no,
+          password: bcrypt.hashSync(SEED_SYSTEM.password, SALT_ROUNDS),
+          full_name: SEED_SYSTEM.full_name,
+          rutbe: SEED_SYSTEM.rutbe,
+          role: SEED_SYSTEM.role,
+          is_active: SEED_SYSTEM.is_active
         })
         this.logger.info(
-          `Varsayılan superadmin oluşturuldu (${SEED_SUPERADMIN.tc_kimlik_no})`,
+          `Varsayılan sistem kullanıcısı oluşturuldu (${SEED_SYSTEM.tc_kimlik_no})`,
           this.getModuleName()
         )
       }
     } catch (err) {
       this.logger.error(
-        'Superadmin oluşturulamadı',
+        'Sistem kullanıcısı oluşturulamadı',
         err instanceof Error ? err : undefined,
         this.getModuleName()
       )
@@ -315,19 +418,26 @@ export class AuthService extends BaseService<User> {
 
   /**
    * Rol yetki kontrolü:
-   * superadmin -> herkesi yönetebilir
-   * admin -> sadece user yönetebilir
+   * system -> superadmin, admin, user atayabilir
+   * superadmin -> sadece admin ve user atayabilir
+   * admin -> sadece user atayabilir
    * user -> kimseyi yönetemez
    */
   private validateRolePermission(actorId: number, targetRole: string): void {
     const actor = this.repository.findById(actorId)
     if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
 
-    const actorLevel = ROLE_HIERARCHY[actor.role]
     const targetLevel = ROLE_HIERARCHY[targetRole as keyof typeof ROLE_HIERARCHY]
-
     if (targetLevel === undefined) throw AppError.badRequest(`Geçersiz rol: ${targetRole}`)
 
+    if (actor.role === 'system') {
+      return
+    }
+    if (targetRole === 'superadmin') {
+      throw AppError.forbidden('Superadmin rolü yalnızca sistem kullanıcısı tarafından atanabilir')
+    }
+
+    const actorLevel = ROLE_HIERARCHY[actor.role]
     if (actor.role !== 'superadmin' && targetLevel >= actorLevel) {
       throw AppError.forbidden(
         `${actor.role} rolü, ${targetRole} rolündeki kullanıcıları yönetemez`

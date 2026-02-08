@@ -8,6 +8,8 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '@renderer/hooks/useAuth'
 import type { RouteConfig } from './routes'
 
+const CHANGE_PASSWORD_PATH = '/change-password'
+
 interface ProtectedRouteProps {
   route: RouteConfig
   children: React.ReactNode
@@ -19,6 +21,16 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps): React.
   // Giriş yapmamışsa login sayfasına yönlendir
   if (!state.isAuthenticated || !state.user) {
     return <Navigate to="/login" replace />
+  }
+
+  // Şifre değiştirme zorunluysa sadece /change-password sayfasına izin ver
+  if (state.user.must_change_password && route.path !== CHANGE_PASSWORD_PATH) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />
+  }
+
+  // Zorunlu şifre sayfasındaysa rol/izin kontrolü yapma
+  if (route.path === CHANGE_PASSWORD_PATH) {
+    return <>{children}</>
   }
 
   // Minimum rol kontrolü
