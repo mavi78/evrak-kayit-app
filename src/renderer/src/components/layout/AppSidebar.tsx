@@ -28,6 +28,7 @@ import {
   IconInfoCircle,
   IconTruck
 } from '@tabler/icons-react'
+import { useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@renderer/hooks/useAuth'
 import { routes, type RouteConfig } from '@renderer/router/routes'
@@ -93,6 +94,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps): R
   const { hasPageAccess, hasMinimumRole } = useAuth()
 
   const visibleRoutes = getVisibleMenuItems(routes, hasPageAccess, hasMinimumRole)
+
+  /** Hiyerarşik menü gruplarının açık/kapalı durumu. Key: parent label; yaprak kapalıyken üst menü aktif gösterilir. */
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const setGroupExpanded = useCallback((label: string, open: boolean) => {
+    setExpandedGroups((prev) => ({ ...prev, [label]: open }))
+  }, [])
 
   const renderLeafItem = (route: RouteConfig): React.ReactNode => {
     const isActive = location.pathname === route.path
@@ -162,6 +169,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps): R
     if (route.children?.length) {
       const parentIcon = PAGE_ICONS[route.pageKey] ?? <IconTruck size={20} stroke={1.5} />
       const isChildActive = route.children.some((c) => location.pathname === c.path)
+      const isGroupOpen = expandedGroups[route.label] ?? isChildActive
+      const isParentActive = isChildActive && !isGroupOpen
 
       if (collapsed) {
         return (
@@ -227,7 +236,9 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps): R
           key={route.label}
           label={route.label}
           leftSection={parentIcon}
-          defaultOpened={isChildActive}
+          active={isParentActive}
+          opened={isGroupOpen}
+          onChange={(open) => setGroupExpanded(route.label, open)}
           variant="filled"
           color="deniz"
           style={{
