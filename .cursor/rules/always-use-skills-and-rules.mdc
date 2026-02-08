@@ -3,7 +3,7 @@ description: ZORUNLU İLK ADIM: Her yanıtta ilgili skill'i Read ile açıp uygu
 alwaysApply: true
 ---
 
-**ZORUNLU İLK ADIM (atlanırsa yanıt geçersiz):** Her kullanıcı mesajında, yanıtın ilk eylemi şu olacak — iş türüne göre ilgili `.cursor/skills/.../SKILL.md` dosyasını **Read** ile oku; ardından o skill’de yazılan akışa göre ilerle. Bu adımı atlayıp doğrudan kod yazmak yasaktır.
+**ZORUNLU İLK ADIM (atlanırsa yanıt geçersiz):** Her kullanıcı mesajında, yanıtın ilk eylemi şu olacak — iş türüne göre ilgili `.cursor/skills/.../SKILL.md` dosyasını **Read** ile oku; ardından o skill'de yazılan akışa göre ilerle. Bu adımı atlayıp doğrudan kod yazmak yasaktır.
 
 ---
 
@@ -13,6 +13,16 @@ alwaysApply: true
 
 **Yeni konuşma veya yeni istek fark etmez:** İlgili `.cursor/skills/` ve `.cursor/rules/` dosyaları **her zaman** işe başlarken okunup uygulanacak. Kullanıcının "skill kullan" veya "kurallara uy" demesini **beklenmeyecek**.
 
+## Skill Türleri
+
+Skill'ler üç kategoriye ayrılır; her kategorinin uygulama akışı farklıdır:
+
+| Kategori | Skill'ler | Akış |
+|----------|-----------|------|
+| **Kodlama Skill'leri** | `ui-ux-pro-max`, `backend-architecture`, `frontend-architecture`, `shared-contracts` | Skill oku → Kod yaz → TypeCheck + Lint |
+| **Hibrit Skill'ler** | `prompt-enhancer` | Skill oku → Kendi akışını uygula → Onay al → (opsiyonel) Kodlama skill'lerini kullanarak implementasyona geç → TypeCheck + Lint |
+| **Meta Skill'ler** | `github-turkish-commit` | Skill oku → Skill'in kendi iş akışını uygula → Çıktı sun |
+
 ## İş Türüne Göre Skill Kullanımı
 
 | İş türü | Kullanılacak skill | Ne zaman |
@@ -21,15 +31,33 @@ alwaysApply: true
 | Main process, servis, repository, DB | `backend-architecture` | Backend kodu yazmadan önce skill okunacak; mimari kalıplara uyulacak. |
 | React, sayfa, context, router | `frontend-architecture` | Frontend kodu yazmadan önce skill okunacak; sayfa/hook/API kalıpları uygulanacak. |
 | IPC, preload, shared tipler | `shared-contracts` | Kanal/tipler tanımlanırken skill okunacak. |
+| Prompt geliştirme, iyileştirme, optimize etme | `prompt-enhancer` | Kullanıcı prompt'unu geliştirmek istediğinde skill okunacak; prompt geliştirildikten sonra belirsizlikler giderilip onay alınırsa kodlama skill'leri ile implementasyona geçilecek. |
+| Git, commit, push, GitHub | `github-turkish-commit` | Kod GitHub'a yüklenirken skill okunacak; kendi iş akışı uygulanacak. |
 
 ## Uygulama Sırası
 
-1. İsteği oku → Hangi alan (UI / backend / frontend / IPC) olduğunu belirle.
-2. **Önce** ilgili skill dosyasını (`SKILL.md`) oku; skill’de yazılan akışı (örn. ui-ux: design-system, checklist) uygula.
-3. Ardından `.cursor/rules/` (project-coding-standards, ilgili strict kurallar) ile uyumlu kod yaz.
-4. Doğrulama: TypeCheck ve Lint (project-coding-standards’taki gibi) mutlaka çalıştır.
+1. İsteği oku → Hangi alan olduğunu ve hangi skill kategorisine girdiğini belirle.
+2. **Önce** ilgili skill dosyasını (`SKILL.md`) oku; skill'de yazılan akışa göre ilerle.
+
+### A) Kodlama Skill'leri (UI, backend, frontend, IPC)
+
+3. `.cursor/rules/` (project-coding-standards, ilgili strict kurallar) ile uyumlu kod yaz.
+4. Doğrulama: TypeCheck ve Lint mutlaka çalıştır.
+
+### B) Hibrit Skill'ler (prompt-enhancer)
+
+3. Skill'in kendi iş akışını uygula (prompt geliştir → belirsizlikleri gider → seçenekleri sun).
+4. Kullanıcıdan implementasyon onayı al.
+5. Onay alınırsa → İlgili kodlama skill'lerini oku, implementasyona geç, TypeCheck + Lint uygula.
+6. Onay alınmazsa → Yalnızca geliştirilmiş prompt'u teslim et, TypeCheck/Lint **atlanır**.
+
+### C) Meta Skill'ler (github-turkish-commit vb.)
+
+3. Skill'in kendi iş akışını uygula.
+4. Çıktıyı skill'de tanımlanan formatta sun. Kod yazılmıyorsa TypeCheck/Lint **atlanır**.
 
 ## Yasak
 
 - "Kullanıcı söylemediği için skill/kural kullanmadım" **kabul edilmez**.
 - Skill veya kuralı yalnızca kullanıcı açıkça istediğinde devreye sokmak **yasaktır**; varsayılan davranış her zaman uyumdur.
+- Saf meta skill'lere kodlama doğrulaması (TypeCheck/Lint) uygulamak **yasaktır** — gereksiz token israfıdır. Ancak hibrit skill'ler (ör. `prompt-enhancer`) implementasyon moduna geçtiğinde TypeCheck/Lint **zorunludur**.
