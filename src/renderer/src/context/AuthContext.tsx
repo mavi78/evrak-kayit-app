@@ -6,7 +6,7 @@
 import { useReducer, useCallback, type ReactNode } from 'react'
 import { authApi } from '@renderer/lib/api'
 import { AuthContext, authReducer, initialState, type AuthContextValue } from './auth-context-def'
-import { PUBLIC_PAGES, SUPERADMIN_ONLY_PAGES, type PageKey } from '@shared/utils'
+import { PUBLIC_PAGES, type PageKey } from '@shared/utils'
 import { ROLE_HIERARCHY, type LoginRequest, type UserRole } from '@shared/types'
 
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
@@ -20,7 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         type: 'LOGIN_SUCCESS',
         payload: {
           user: response.data.user,
-          permissions: response.data.permissions
+          permissions: response.data.permissions,
+          roleVisibilityDefaults: response.data.role_visibility_defaults ?? []
         }
       })
     } else {
@@ -36,13 +37,20 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   const hasPageAccess = useCallback(
     (pageKey: PageKey): boolean => {
       if (!state.user) return false
-      if (state.user.role === 'system' || state.user.role === 'superadmin') return true
+
+      // system: tüm sayfalara erişir
+      if (state.user.role === 'system') return true
+
+      // Public sayfalar: sadece Ana Sayfa ve Login (login route'ta ayrı; burada dashboard)
       if (PUBLIC_PAGES.includes(pageKey)) return true
-      if (SUPERADMIN_ONLY_PAGES.includes(pageKey)) return false
-      const permission = state.permissions.find((p) => p.page_key === pageKey)
-      return permission?.can_access ?? false
+
+      // İzinler sadece rol bazlı: backend role_page_defaults + role_visibility_defaults birleşimi döner
+      const roleDefault = state.roleVisibilityDefaults.find((r) => r.page_key === pageKey)
+      if (roleDefault !== undefined) return roleDefault.can_access
+
+      return false
     },
-    [state.user, state.permissions]
+    [state.user, state.roleVisibilityDefaults]
   )
 
   const hasMinimumRole = useCallback(
@@ -59,6 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     if (response.success && response.data) {
       dispatch({ type: 'UPDATE_PERMISSIONS', payload: response.data.permissions })
       dispatch({ type: 'UPDATE_USER', payload: response.data.user })
+      dispatch({
+        type: 'UPDATE_ROLE_VISIBILITY_DEFAULTS',
+        payload: response.data.role_visibility_defaults ?? []
+      })
     }
   }, [state.user])
 

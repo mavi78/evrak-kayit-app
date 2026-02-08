@@ -14,6 +14,7 @@ import type {
   ChangePasswordRequest,
   SetPermissionRequest,
   PagePermission,
+  RoleVisibilityDefault,
   DeleteUserRequest
 } from '@shared/types'
 
@@ -76,5 +77,45 @@ export const authApi = {
     invoke<PagePermission[]>('auth:get-permissions', { user_id: userId }),
 
   getCurrentUser: (userId: number): Promise<ServiceResponse<LoginResponse>> =>
-    invoke<LoginResponse>('auth:get-current-user', { user_id: userId })
+    invoke<LoginResponse>('auth:get-current-user', { user_id: userId }),
+
+  getRolePageDefaults: (role: 'superadmin' | 'admin' | 'user'): Promise<ServiceResponse<string[]>> =>
+    invoke<string[]>('auth:get-role-page-defaults', { role }),
+
+  setRolePageDefaults: (data: {
+    role: 'superadmin' | 'admin' | 'user'
+    page_keys: string[]
+    set_by: number
+  }): Promise<ServiceResponse<null>> =>
+    invoke<null>('auth:set-role-page-defaults', data),
+
+  getAssignablePages: (
+    targetUserId: number,
+    actorId: number
+  ): Promise<ServiceResponse<string[]>> =>
+    invoke<string[]>('auth:get-assignable-pages', {
+      target_user_id: targetUserId,
+      actor_id: actorId
+    }),
+
+  getAssignablePagesForRole: (
+    actorId: number,
+    targetRole: 'superadmin' | 'admin' | 'user'
+  ): Promise<ServiceResponse<string[]>> =>
+    invoke<string[]>('auth:get-assignable-pages-for-role', {
+      actor_id: actorId,
+      target_role: targetRole
+    }),
+
+  getRoleVisibilityDefaults: (
+    role: 'superadmin' | 'admin' | 'user'
+  ): Promise<ServiceResponse<RoleVisibilityDefault[]>> =>
+    invoke<RoleVisibilityDefault[]>('auth:get-role-visibility-defaults', { role }),
+
+  setRoleVisibilityDefaults: (data: {
+    target_role: 'superadmin' | 'admin' | 'user'
+    defaults: RoleVisibilityDefault[]
+    actor_id: number
+  }): Promise<ServiceResponse<null>> =>
+    invoke<null>('auth:set-role-visibility-defaults', data)
 }

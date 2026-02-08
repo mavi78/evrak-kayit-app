@@ -45,9 +45,17 @@ export interface LoginRequest {
   password: string
 }
 
+/** Rol bazlı varsayılan görünürlük — kullanıcıya özel izin yoksa bu kullanılır */
+export interface RoleVisibilityDefault {
+  page_key: string
+  can_access: boolean
+}
+
 export interface LoginResponse {
   user: UserWithoutPassword
   permissions: PagePermission[]
+  /** Giriş yapan kullanıcının rolüne göre varsayılan sayfa görünürlüğü (hasPageAccess fallback) */
+  role_visibility_defaults: RoleVisibilityDefault[]
 }
 
 export interface CreateUserRequest {
@@ -86,6 +94,59 @@ export interface SetPermissionRequest {
 
 export interface GetPermissionsRequest {
   user_id: number
+}
+
+/**
+ * Rol bazlı varsayılan sayfa seti — system tarafından atanabilir sayfalar.
+ * role: superadmin | admin | user (system için tabloda kayıt yok)
+ */
+export interface GetRolePageDefaultsRequest {
+  role: Exclude<UserRole, 'system'>
+}
+
+export interface SetRolePageDefaultsRequest {
+  /** Hedef rol (superadmin, admin, user) */
+  role: Exclude<UserRole, 'system'>
+  /** Bu role atanacak sayfa anahtarları */
+  page_keys: string[]
+  /** İşlemi yapan kullanıcı (sadece system) */
+  set_by: number
+}
+
+/**
+ * Bir kullanıcıya atanabilir sayfalar — UI'da hangi sayfaların açılıp kapatılabileceğini göstermek için.
+ */
+export interface GetAssignablePagesRequest {
+  /** İznin ayarlanacak hedef kullanıcı ID */
+  target_user_id: number
+  /** İşlemi yapacak kullanıcı ID */
+  actor_id: number
+}
+
+/**
+ * Hedef role atanabilir sayfalar (kullanıcı ID olmadan; rol bazlı UI için).
+ * Actor'ın kendinde olan sayfaları döner (alt role açıp kapatabildiği).
+ */
+export interface GetAssignablePagesForRoleRequest {
+  actor_id: number
+  target_role: Exclude<UserRole, 'system'>
+}
+
+/**
+ * Rol varsayılan görünürlüğü — superadmin/admin bir altındaki rollere varsayılan aç/kapa atar.
+ * Üst rolün verdiği sayfa izinleri doğrultusunda.
+ */
+export interface GetRoleVisibilityDefaultsRequest {
+  role: Exclude<UserRole, 'system'>
+}
+
+export interface SetRoleVisibilityDefaultsRequest {
+  /** Hedef rol (superadmin: admin|user, admin: user) */
+  target_role: Exclude<UserRole, 'system'>
+  /** Sayfa anahtarı ve varsayılan açık/kapalı */
+  defaults: RoleVisibilityDefault[]
+  /** İşlemi yapan kullanıcı ID */
+  actor_id: number
 }
 
 export interface DeleteUserRequest {

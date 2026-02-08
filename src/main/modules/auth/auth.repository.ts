@@ -5,7 +5,7 @@
 // ============================================================
 
 import { BaseRepository } from '@main/core/BaseRepository'
-import type { User, UserWithoutPassword, PagePermission } from '@shared/types'
+import type { User, UserWithoutPassword, PagePermission, UserRole } from '@shared/types'
 
 export class AuthRepository extends BaseRepository<User> {
   /** page_permissions tablosundaki boolean kolonlar */
@@ -52,6 +52,41 @@ export class AuthRepository extends BaseRepository<User> {
         details TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         FOREIGN KEY (user_id) REFERENCES users(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS role_page_defaults (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+        page_key TEXT NOT NULL,
+        set_by INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        FOREIGN KEY (set_by) REFERENCES users(id),
+        UNIQUE(role, page_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS role_visibility_defaults (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_role TEXT NOT NULL CHECK(target_role IN ('superadmin', 'admin', 'user')),
+        page_key TEXT NOT NULL,
+        can_access INTEGER NOT NULL DEFAULT 1 CHECK(can_access IN (0, 1)),
+        granted_by INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        FOREIGN KEY (granted_by) REFERENCES users(id),
+        UNIQUE(target_role, page_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS role_page_access (
+        role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+        page_key TEXT NOT NULL,
+        can_access INTEGER NOT NULL DEFAULT 1 CHECK(can_access IN (0, 1)),
+        granted_by INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        PRIMARY KEY (role, page_key),
+        FOREIGN KEY (granted_by) REFERENCES users(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS role_system_defaults (
+        role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+        page_key TEXT NOT NULL,
+        can_access INTEGER NOT NULL DEFAULT 1 CHECK(can_access IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        PRIMARY KEY (role, page_key)
       )`
     ]
   }
@@ -61,6 +96,10 @@ export class AuthRepository extends BaseRepository<User> {
     this.migrateUsersTableIfNeeded()
     this.migrateUsersRoleToIncludeSystem()
     this.migrateUsersAddMustChangePassword()
+    this.ensureRolePageDefaultsTable()
+    this.ensureRoleVisibilityDefaultsTable()
+    this.ensureRolePageAccessTableAndMigrate()
+    this.ensureRoleSystemDefaultsTableAndSeed()
   }
 
   /**
@@ -241,6 +280,258 @@ export class AuthRepository extends BaseRepository<User> {
   deletePermissionsByUserId(userId: number): void {
     this.safeExecute(() => {
       this.db.prepare(`DELETE FROM page_permissions WHERE user_id = ?`).run(userId)
+    })
+  }
+
+  // ================================================================
+  // ROL SAYFA ERİŞİMİ (role_page_access — tek kaynak)
+  // ================================================================
+
+  /** Belirtilen rol için sayfa erişim listesini getirir (page_key, can_access). */
+  getRolePageAccess(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+    return this.safeExecute(() => {
+      const stmt = this.db.prepare(
+        `SELECT page_key, can_access FROM role_page_access WHERE role = ? ORDER BY page_key`
+      )
+      const rows = stmt.all(role) as { page_key: string; can_access: number }[]
+      return rows.map((r) => ({ page_key: r.page_key, can_access: r.can_access === 1 }))
+    })
+  }
+
+  /** Belirtilen rol için sayfa erişim listesini günceller (önce siler, sonra ekler). */
+  setRolePageAccess(
+    role: Exclude<UserRole, 'system'>,
+    defaults: { page_key: string; can_access: boolean }[],
+    grantedBy: number | null
+  ): void {
+    this.safeExecute(() => {
+      this.db.prepare(`DELETE FROM role_page_access WHERE role = ?`).run(role)
+      const insert = this.db.prepare(
+        `INSERT INTO role_page_access (role, page_key, can_access, granted_by) VALUES (?, ?, ?, ?)`
+      )
+      for (const d of defaults) {
+        insert.run(role, d.page_key, d.can_access ? 1 : 0, grantedBy)
+      }
+    })
+  }
+
+  /** Eski tablolardan role_page_access'e veri taşır; tablo yoksa oluşturur. */
+  private ensureRolePageAccessTableAndMigrate(): void {
+    this.safeExecute(() => {
+      const tables = this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='role_page_access'")
+        .all() as { name: string }[]
+      if (tables.length > 0) return
+
+      this.db.exec(
+        `CREATE TABLE IF NOT EXISTS role_page_access (
+          role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+          page_key TEXT NOT NULL,
+          can_access INTEGER NOT NULL DEFAULT 1 CHECK(can_access IN (0, 1)),
+          granted_by INTEGER,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          PRIMARY KEY (role, page_key),
+          FOREIGN KEY (granted_by) REFERENCES users(id)
+        )`
+      )
+
+      const rpd = this.db.prepare(`SELECT role, page_key, set_by FROM role_page_defaults`).all() as {
+        role: string
+        page_key: string
+        set_by: number | null
+      }[]
+      const rvd = this.db
+        .prepare(`SELECT target_role AS role, page_key, can_access, granted_by FROM role_visibility_defaults`)
+        .all() as { role: string; page_key: string; can_access: number; granted_by: number }[]
+      const byRole = new Map<string, Map<string, { can_access: number; granted_by: number | null }>>()
+      for (const r of rpd) {
+        if (!byRole.has(r.role)) byRole.set(r.role, new Map())
+        byRole.get(r.role)!.set(r.page_key, { can_access: 1, granted_by: r.set_by ?? null })
+      }
+      for (const r of rvd) {
+        if (!byRole.has(r.role)) byRole.set(r.role, new Map())
+        byRole.get(r.role)!.set(r.page_key, { can_access: r.can_access, granted_by: r.granted_by })
+      }
+      const insert = this.db.prepare(
+        `INSERT INTO role_page_access (role, page_key, can_access, granted_by) VALUES (?, ?, ?, ?)`
+      )
+      for (const [role, map] of byRole) {
+        for (const [page_key, v] of map) {
+          insert.run(role, page_key, v.can_access, v.granted_by)
+        }
+      }
+      this.logger.info('role_page_access tablosu oluşturuldu ve veri taşındı', 'AuthRepository')
+    })
+  }
+
+  // ================================================================
+  // SYSTEM DEFAULT SAYFA ERİŞİMİ (role_system_defaults — sadece system yazar)
+  // ================================================================
+
+  /** System'ın belirli bir role verdiği sayfa erişim listesini getirir. */
+  getRoleSystemDefaults(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+    return this.safeExecute(() => {
+      const stmt = this.db.prepare(
+        `SELECT page_key, can_access FROM role_system_defaults WHERE role = ? ORDER BY page_key`
+      )
+      const rows = stmt.all(role) as { page_key: string; can_access: number }[]
+      return rows.map((r) => ({ page_key: r.page_key, can_access: r.can_access === 1 }))
+    })
+  }
+
+  /** System'ın belirli bir role verdiği sayfa erişim listesini günceller (sadece system çağırır). */
+  setRoleSystemDefaults(
+    role: Exclude<UserRole, 'system'>,
+    defaults: { page_key: string; can_access: boolean }[]
+  ): void {
+    this.safeExecute(() => {
+      this.db.prepare(`DELETE FROM role_system_defaults WHERE role = ?`).run(role)
+      const insert = this.db.prepare(
+        `INSERT INTO role_system_defaults (role, page_key, can_access) VALUES (?, ?, ?)`
+      )
+      for (const d of defaults) {
+        insert.run(role, d.page_key, d.can_access ? 1 : 0)
+      }
+    })
+  }
+
+  /**
+   * Rol için efektif sayfa erişimi: önce role_system_defaults, üzerine role_page_access (override) uygulanır.
+   * Listeleme ve hasPageAccess bu sonucu kullanır.
+   */
+  getEffectiveRolePageAccess(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+    const systemDefaults = this.getRoleSystemDefaults(role)
+    const overrides = this.getRolePageAccess(role)
+    const byPage = new Map<string, boolean>()
+    for (const r of systemDefaults) {
+      byPage.set(r.page_key, r.can_access)
+    }
+    for (const r of overrides) {
+      byPage.set(r.page_key, r.can_access)
+    }
+    return Array.from(byPage.entries())
+      .map(([page_key, can_access]) => ({ page_key, can_access }))
+      .sort((a, b) => a.page_key.localeCompare(b.page_key))
+  }
+
+  /** role_system_defaults tablosu yoksa oluşturur ve boşsa seed doldurur. */
+  private ensureRoleSystemDefaultsTableAndSeed(): void {
+    this.safeExecute(() => {
+      const tables = this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='role_system_defaults'")
+        .all() as { name: string }[]
+      if (tables.length === 0) {
+        this.db.exec(
+          `CREATE TABLE IF NOT EXISTS role_system_defaults (
+            role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+            page_key TEXT NOT NULL,
+            can_access INTEGER NOT NULL DEFAULT 1 CHECK(can_access IN (0, 1)),
+            created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            PRIMARY KEY (role, page_key)
+          )`
+        )
+        this.logger.info('role_system_defaults tablosu oluşturuldu', 'AuthRepository')
+      }
+      const count = (this.db.prepare(`SELECT COUNT(*) as c FROM role_system_defaults`).get() as { c: number }).c
+      if (count === 0) {
+        const insert = this.db.prepare(
+          `INSERT INTO role_system_defaults (role, page_key, can_access) VALUES (?, ?, ?)`
+        )
+        const pages = ['user-management', 'page-management', 'courier-delivered', 'courier-not-delivered']
+        for (const p of pages) {
+          insert.run('superadmin', p, 1)
+        }
+        insert.run('admin', 'user-management', 1)
+        insert.run('admin', 'courier-delivered', 1)
+        insert.run('admin', 'courier-not-delivered', 1)
+        insert.run('user', 'courier-delivered', 1)
+        insert.run('user', 'courier-not-delivered', 1)
+        this.logger.info('role_system_defaults seed verisi eklendi', 'AuthRepository')
+      }
+    })
+  }
+
+  // ================================================================
+  // ROL SAYFA VARSAYILANLARI (system default — role_system_defaults)
+  // ================================================================
+
+  /** Belirtilen rol için system'ın verdiği açık sayfa anahtarlarını getirir (API uyumu). */
+  getRolePageDefaults(role: Exclude<UserRole, 'system'>): string[] {
+    return this.getRoleSystemDefaults(role)
+      .filter((r) => r.can_access)
+      .map((r) => r.page_key)
+  }
+
+  /** Belirtilen rol için system sayfa setini günceller — sadece system kullanıcısı. */
+  setRolePageDefaults(role: Exclude<UserRole, 'system'>, pageKeys: string[]): void {
+    this.setRoleSystemDefaults(
+      role,
+      pageKeys.map((page_key) => ({ page_key, can_access: true }))
+    )
+  }
+
+  /** role_page_defaults tablosu yoksa oluşturur (migration). */
+  private ensureRolePageDefaultsTable(): void {
+    this.safeExecute(() => {
+      const tables = this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='role_page_defaults'")
+        .all() as { name: string }[]
+      if (tables.length > 0) return
+      this.db.exec(
+        `CREATE TABLE IF NOT EXISTS role_page_defaults (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          role TEXT NOT NULL CHECK(role IN ('superadmin', 'admin', 'user')),
+          page_key TEXT NOT NULL,
+          set_by INTEGER,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          FOREIGN KEY (set_by) REFERENCES users(id),
+          UNIQUE(role, page_key)
+        )`
+      )
+      this.logger.info('role_page_defaults tablosu oluşturuldu', 'AuthRepository')
+    })
+  }
+
+  // ================================================================
+  // ROL VARSAYILAN GÖRÜNÜRLÜK (efektif: system default + override)
+  // ================================================================
+
+  /** Belirtilen rol için efektif sayfa görünürlüğünü getirir (system default + role_page_access override). */
+  getRoleVisibilityDefaults(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+    return this.getEffectiveRolePageAccess(role)
+  }
+
+  /** Rol sayfa erişimini günceller (üst rol alt rol için aç/kapa; role_page_access override). */
+  setRoleVisibilityDefaults(
+    targetRole: Exclude<UserRole, 'system'>,
+    defaults: { page_key: string; can_access: boolean }[],
+    grantedBy: number
+  ): void {
+    this.setRolePageAccess(targetRole, defaults, grantedBy)
+  }
+
+  /** role_visibility_defaults tablosu yoksa oluşturur (migration). */
+  private ensureRoleVisibilityDefaultsTable(): void {
+    this.safeExecute(() => {
+      const tables = this.db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='role_visibility_defaults'"
+        )
+        .all() as { name: string }[]
+      if (tables.length > 0) return
+      this.db.exec(
+        `CREATE TABLE IF NOT EXISTS role_visibility_defaults (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          target_role TEXT NOT NULL CHECK(target_role IN ('superadmin', 'admin', 'user')),
+          page_key TEXT NOT NULL,
+          can_access INTEGER NOT NULL DEFAULT 1 CHECK(can_access IN (0, 1)),
+          granted_by INTEGER NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          FOREIGN KEY (granted_by) REFERENCES users(id),
+          UNIQUE(target_role, page_key)
+        )`
+      )
+      this.logger.info('role_visibility_defaults tablosu oluşturuldu', 'AuthRepository')
     })
   }
 

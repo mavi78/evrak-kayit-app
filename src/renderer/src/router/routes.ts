@@ -30,6 +30,9 @@ export interface RouteConfig {
 // ---- Lazy loaded sayfa bileşenleri ----
 const DashboardPage = lazy(() => import('@renderer/pages/dashboard/DashboardPage'))
 const UserManagementPage = lazy(() => import('@renderer/pages/user-management/UserManagementPage'))
+const PageManagementPage = lazy(
+  () => import('@renderer/pages/page-management/PageManagementPage')
+)
 const CourierDeliveredPage = lazy(() => import('@renderer/pages/courier/CourierDeliveredPage'))
 const CourierNotDeliveredPage = lazy(
   () => import('@renderer/pages/courier/CourierNotDeliveredPage')
@@ -75,15 +78,24 @@ export const routes: RouteConfig[] = [
     pageKey: 'user-management',
     showInSidebar: true,
     label: 'Kullanıcı Yönetimi',
-    minimumRole: 'admin',
-    requiresPermission: false
+    minimumRole: 'user',
+    requiresPermission: true
+  },
+  {
+    path: '/page-management',
+    component: PageManagementPage,
+    pageKey: 'page-management',
+    showInSidebar: true,
+    label: 'Sayfa Yönetimi',
+    minimumRole: 'user',
+    requiresPermission: true
   },
   {
     path: '',
     pageKey: 'courier-delivered',
     showInSidebar: true,
     label: 'Kurye işlemleri',
-    requiresPermission: false,
+    requiresPermission: true,
     children: [
       {
         path: '/courier/delivered',
@@ -91,7 +103,7 @@ export const routes: RouteConfig[] = [
         pageKey: 'courier-delivered',
         showInSidebar: true,
         label: 'Teslim edilen',
-        requiresPermission: false
+        requiresPermission: true
       },
       {
         path: '/courier/not-delivered',
@@ -99,7 +111,7 @@ export const routes: RouteConfig[] = [
         pageKey: 'courier-not-delivered',
         showInSidebar: true,
         label: 'Teslim edilmeyen',
-        requiresPermission: false
+        requiresPermission: true
       }
     ]
   }

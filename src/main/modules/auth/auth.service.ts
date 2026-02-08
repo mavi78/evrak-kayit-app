@@ -13,7 +13,7 @@ import { BaseService } from '@main/core/BaseService'
 import { AppError } from '@main/core/AppError'
 import { AuthRepository } from './auth.repository'
 import { ROLE_HIERARCHY } from '@shared/types'
-import { validatePassword, isValidTcKimlikNo } from '@shared/utils'
+import { validatePassword, isValidTcKimlikNo, PAGES_REQUIRING_PERMISSION } from '@shared/utils'
 import type {
   ServiceResponse,
   User,
@@ -24,6 +24,13 @@ import type {
   UpdateUserRequest,
   ChangePasswordRequest,
   SetPermissionRequest,
+  GetRolePageDefaultsRequest,
+  SetRolePageDefaultsRequest,
+  GetAssignablePagesRequest,
+  GetAssignablePagesForRoleRequest,
+  GetRoleVisibilityDefaultsRequest,
+  SetRoleVisibilityDefaultsRequest,
+  RoleVisibilityDefault,
   PagePermission
 } from '@shared/types'
 import type { ServiceHandlerMap } from '@main/core/types'
@@ -226,7 +233,19 @@ export class AuthService extends BaseService<User> {
       'auth:change-password': (data) => this.changePassword(data as ChangePasswordRequest),
       'auth:set-permission': (data) => this.setPermission(data as SetPermissionRequest),
       'auth:get-permissions': (data) => this.getPermissions(data as { user_id: number }),
-      'auth:get-current-user': (data) => this.getCurrentUser(data as { user_id: number })
+      'auth:get-current-user': (data) => this.getCurrentUser(data as { user_id: number }),
+      'auth:get-role-page-defaults': (data) =>
+        this.getRolePageDefaults(data as GetRolePageDefaultsRequest),
+      'auth:set-role-page-defaults': (data) =>
+        this.setRolePageDefaults(data as SetRolePageDefaultsRequest),
+      'auth:get-assignable-pages': (data) =>
+        this.getAssignablePages(data as GetAssignablePagesRequest),
+      'auth:get-assignable-pages-for-role': (data) =>
+        this.getAssignablePagesForRole(data as GetAssignablePagesForRoleRequest),
+      'auth:get-role-visibility-defaults': (data) =>
+        this.getRoleVisibilityDefaults(data as GetRoleVisibilityDefaultsRequest),
+      'auth:set-role-visibility-defaults': (data) =>
+        this.setRoleVisibilityDefaults(data as SetRoleVisibilityDefaultsRequest)
     }
   }
 
@@ -250,10 +269,14 @@ export class AuthService extends BaseService<User> {
     }
 
     const response = this.stripPassword(user)
-    const permissions = this.repository.getPermissionsByUserId(user.id)
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const roleVisibilityDefaults = this.buildRoleVisibilityDefaultsForUser(user.role, permissionKeysSet)
 
     this.repository.addAuditLog(user.id, 'LOGIN', `${user.full_name} (${tcTrim}) giriş yaptı`)
-    return this.ok({ user: response, permissions }, 'Giriş başarılı')
+    return this.ok(
+      { user: response, permissions: [], role_visibility_defaults: roleVisibilityDefaults },
+      'Giriş başarılı'
+    )
   }
 
   /**
@@ -323,12 +346,17 @@ export class AuthService extends BaseService<User> {
     return this.ok(null, 'Şifre başarıyla değiştirildi')
   }
 
-  /** Sayfa izni ayarla */
+  /** Sayfa izni ayarla — hiyerarşi: system tüm sayfalar; superadmin role defaults; admin sadece superadmin'ın verdiği sayfalar */
   private async setPermission(
     data: SetPermissionRequest
   ): Promise<ServiceResponse<PagePermission>> {
     if (!data.user_id || !data.page_key) {
       throw AppError.badRequest('Kullanıcı ID ve sayfa anahtarı zorunludur')
+    }
+
+    const validPageKeys = PAGES_REQUIRING_PERMISSION as readonly string[]
+    if (!validPageKeys.includes(data.page_key)) {
+      throw AppError.badRequest(`Geçersiz sayfa anahtarı: ${data.page_key}`)
     }
 
     const target = this.repository.findById(data.user_id)
@@ -337,11 +365,45 @@ export class AuthService extends BaseService<User> {
     const grantor = this.repository.findById(data.granted_by)
     if (!grantor) throw AppError.notFound('Yetki veren kullanıcı bulunamadı')
 
+    if (target.role === 'system') {
+      throw AppError.forbidden('Sistem kullanıcısına sayfa kısıtlaması uygulanamaz')
+    }
     if (grantor.role === 'user') {
       throw AppError.forbidden('User rolünde izin verme yetkiniz bulunmuyor')
     }
     if (grantor.role === 'admin' && target.role !== 'user') {
       throw AppError.forbidden('Admin sadece user rolündeki kullanıcılara izin verebilir')
+    }
+
+    if (grantor.role === 'system') {
+      // system: herhangi bir geçerli sayfa atayabilir
+    } else if (grantor.role === 'superadmin') {
+      if (target.role !== 'admin' && target.role !== 'user') {
+        throw AppError.forbidden('Superadmin sadece admin ve user rollerine sayfa atayabilir')
+      }
+      const allowed = new Set(
+        this.repository
+          .getRoleSystemDefaults(grantor.role)
+          .filter((r) => r.can_access)
+          .map((r) => r.page_key)
+      )
+      if (!allowed.has(data.page_key)) {
+        throw AppError.forbidden(
+          `Bu sayfa (${data.page_key}) size atanmamış; sadece system'ın size verdiği sayfaları atayabilirsiniz`
+        )
+      }
+    } else if (grantor.role === 'admin') {
+      const allowed = new Set(
+        this.repository
+          .getRoleSystemDefaults('admin')
+          .filter((r) => r.can_access)
+          .map((r) => r.page_key)
+      )
+      if (!allowed.has(data.page_key)) {
+        throw AppError.forbidden(
+          'Admin sadece kendine verilen sayfalar üzerinde açma/kısıtlama yapabilir'
+        )
+      }
     }
 
     const permission = this.repository.upsertPermission(
@@ -374,14 +436,212 @@ export class AuthService extends BaseService<User> {
     if (!user) throw AppError.notFound('Kullanıcı bulunamadı')
 
     const response = this.stripPassword(user)
-    const permissions = this.repository.getPermissionsByUserId(user.id)
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const roleVisibilityDefaults = this.buildRoleVisibilityDefaultsForUser(user.role, permissionKeysSet)
 
-    return this.ok({ user: response, permissions }, 'Kullanıcı bilgileri getirildi')
+    return this.ok(
+      {
+        user: response,
+        permissions: [],
+        role_visibility_defaults: roleVisibilityDefaults
+      },
+      'Kullanıcı bilgileri getirildi'
+    )
+  }
+
+  /** Rol bazlı varsayılan sayfa setini getirir — sadece system çağırabilir. Sadece menüdeki sayfalar döner. */
+  private async getRolePageDefaults(
+    data: GetRolePageDefaultsRequest
+  ): Promise<ServiceResponse<string[]>> {
+    const role = data.role
+    if (role !== 'superadmin' && role !== 'admin' && role !== 'user') {
+      throw AppError.badRequest('Geçersiz rol; superadmin, admin veya user olmalı')
+    }
+    const fromDb = this.repository.getRolePageDefaults(role)
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const pageKeys = fromDb.filter((k) => permissionKeysSet.has(k))
+    return this.ok(pageKeys, 'Rol sayfa varsayılanları getirildi')
+  }
+
+  /** Rol bazlı varsayılan sayfa setini günceller — sadece system çağırabilir. */
+  private async setRolePageDefaults(
+    data: SetRolePageDefaultsRequest
+  ): Promise<ServiceResponse<null>> {
+    if (!data.role || data.page_keys === undefined || !data.set_by) {
+      throw AppError.badRequest('Rol, sayfa anahtarları ve işlemi yapan kullanıcı zorunludur')
+    }
+    const actor = this.repository.findById(data.set_by)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+    if (actor.role !== 'system') {
+      throw AppError.forbidden('Rol sayfa varsayılanları yalnızca sistem kullanıcısı tarafından ayarlanabilir')
+    }
+    const validPageKeys = PAGES_REQUIRING_PERMISSION as readonly string[]
+    for (const key of data.page_keys) {
+      if (!validPageKeys.includes(key)) {
+        throw AppError.badRequest(`Geçersiz sayfa anahtarı: ${key}`)
+      }
+    }
+    const role = data.role as 'superadmin' | 'admin' | 'user'
+    this.repository.setRolePageDefaults(role, data.page_keys)
+    this.repository.addAuditLog(
+      data.set_by,
+      'SET_ROLE_PAGE_DEFAULTS',
+      `${role} rolü için ${data.page_keys.length} sayfa tanımlandı`
+    )
+    return this.ok(null, 'Rol sayfa varsayılanları güncellendi')
+  }
+
+  /**
+   * Hedef role atanabilir sayfa anahtarlarını döndürür (UI için).
+   * system: tüm sayfalar; superadmin: kendine verilen sayfalar; admin: kendine verilen sayfalar.
+   */
+  private async getAssignablePages(
+    data: GetAssignablePagesRequest
+  ): Promise<ServiceResponse<string[]>> {
+    const actor = this.repository.findById(data.actor_id)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+    const target = this.repository.findById(data.target_user_id)
+    if (!target) throw AppError.notFound('Hedef kullanıcı bulunamadı')
+
+    if (target.role === 'system') {
+      return this.ok([], 'Sistem kullanıcısına sayfa atanmaz')
+    }
+    if (actor.role === 'user') {
+      throw AppError.forbidden('User rolü sayfa yönetimi yapamaz')
+    }
+    if (actor.role === 'admin' && target.role !== 'user') {
+      throw AppError.forbidden('Admin sadece user rolündeki kullanıcılar için sayfa atayabilir')
+    }
+
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const assignable =
+      actor.role === 'system'
+        ? [...PAGES_REQUIRING_PERMISSION]
+        : this.repository
+            .getRoleSystemDefaults(actor.role)
+            .filter((r) => r.can_access && permissionKeysSet.has(r.page_key))
+            .map((r) => r.page_key)
+    return this.ok(assignable, 'Atanabilir sayfalar getirildi')
+  }
+
+  /**
+   * Hedef rol için listelenecek sayfa anahtarlarını döndürür (Sayfa Yönetimi UI).
+   * Liste = system'ın hedef role verdiği default sayfalar (role_system_defaults(target_role)).
+   * Örn: superadmin "admin" seçince sadece system'ın admin'e verdiği sayfalar (örn. Kullanıcı Yönetimi) listelenir.
+   */
+  private async getAssignablePagesForRole(
+    data: GetAssignablePagesForRoleRequest
+  ): Promise<ServiceResponse<string[]>> {
+    const actor = this.repository.findById(data.actor_id)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+
+    if (actor.role === 'user') {
+      throw AppError.forbidden('User rolü sayfa yönetimi yapamaz')
+    }
+    const targetRole = data.target_role
+    if (actor.role === 'superadmin' && targetRole !== 'admin' && targetRole !== 'user') {
+      throw AppError.badRequest('Superadmin sadece admin veya user rolü için atanabilir sayfa alabilir')
+    }
+    if (actor.role === 'admin' && targetRole !== 'user') {
+      throw AppError.badRequest('Admin sadece user rolü için atanabilir sayfa alabilir')
+    }
+
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const list =
+      actor.role === 'system'
+        ? [...PAGES_REQUIRING_PERMISSION]
+        : this.repository
+            .getRoleSystemDefaults(targetRole)
+            .filter((r) => r.can_access && permissionKeysSet.has(r.page_key))
+            .map((r) => r.page_key)
+    return this.ok(list, 'Hedef rol için listelenecek sayfalar getirildi')
+  }
+
+  /** Rol sayfa erişimini getirir (efektif: role_system_defaults + role_page_access override). */
+  private async getRoleVisibilityDefaults(
+    data: GetRoleVisibilityDefaultsRequest
+  ): Promise<ServiceResponse<RoleVisibilityDefault[]>> {
+    const role = data.role
+    if (role !== 'superadmin' && role !== 'admin' && role !== 'user') {
+      throw AppError.badRequest('Geçersiz rol; superadmin, admin veya user olmalı')
+    }
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const list = this.repository
+      .getEffectiveRolePageAccess(role)
+      .filter((r) => permissionKeysSet.has(r.page_key))
+    return this.ok(list, 'Rol sayfa erişimi getirildi')
+  }
+
+  /**
+   * Alt rol için sayfa erişimini günceller. Sadece hedef role system'ın verdiği sayfalar üzerinde aç/kapa yapılabilir.
+   * Superadmin → admin veya user; admin → user. İzin verilen sayfalar = role_system_defaults(target_role).
+   */
+  private async setRoleVisibilityDefaults(
+    data: SetRoleVisibilityDefaultsRequest
+  ): Promise<ServiceResponse<null>> {
+    if (!data.target_role || !data.defaults || !data.actor_id) {
+      throw AppError.badRequest('Hedef rol, varsayılanlar ve işlemi yapan kullanıcı zorunludur')
+    }
+    const actor = this.repository.findById(data.actor_id)
+    if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
+
+    const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
+    const targetRole = data.target_role as 'superadmin' | 'admin' | 'user'
+
+    if (actor.role === 'superadmin') {
+      if (targetRole !== 'admin' && targetRole !== 'user') {
+        throw AppError.forbidden('Superadmin sadece admin ve user rollerine sayfa açıp kapatabilir')
+      }
+    } else if (actor.role === 'admin') {
+      if (targetRole !== 'user') {
+        throw AppError.forbidden('Admin sadece user rolüne sayfa açıp kapatabilir')
+      }
+    } else {
+      throw AppError.forbidden('Bu işlem için yetkiniz yok')
+    }
+
+    const allowed = new Set(
+      this.repository
+        .getRoleSystemDefaults(targetRole)
+        .filter((r) => r.can_access && permissionKeysSet.has(r.page_key))
+        .map((r) => r.page_key)
+    )
+    const filtered = data.defaults.filter((d) => {
+      if (!permissionKeysSet.has(d.page_key)) return false
+      if (!allowed.has(d.page_key)) {
+        throw AppError.forbidden(
+          `Sayfa (${d.page_key}) hedef role system tarafından verilmediği için atanamaz`
+        )
+      }
+      return true
+    })
+
+    this.repository.setRolePageAccess(targetRole, filtered, data.actor_id)
+    this.repository.addAuditLog(
+      data.actor_id,
+      'SET_ROLE_PAGE_ACCESS',
+      `${targetRole} rolü için ${filtered.length} sayfa güncellendi`
+    )
+    return this.ok(null, 'Rol sayfa erişimi güncellendi')
   }
 
   // ================================================================
   // YARDIMCILAR
   // ================================================================
+
+  /**
+   * Rol bazlı sayfa erişimi (efektif: role_system_defaults + role_page_access override).
+   * system: boş (tüm sayfalara erişir); diğer roller: getEffectiveRolePageAccess.
+   */
+  private buildRoleVisibilityDefaultsForUser(
+    role: User['role'],
+    permissionKeysSet: Set<string>
+  ): { page_key: string; can_access: boolean }[] {
+    if (role === 'system') return []
+    return this.repository
+      .getEffectiveRolePageAccess(role)
+      .filter((r) => permissionKeysSet.has(r.page_key))
+  }
 
   /** İlk çalıştırmada varsayılan sistem kullanıcısı oluştur (asla silinemez, tüm yetkiler) */
   private seedSystemUser(): void {
