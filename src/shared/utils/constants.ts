@@ -9,6 +9,7 @@ export const PAGE_KEYS = {
   OUTGOING_DOCUMENTS: 'outgoing-documents',
   TRANSIT_DOCUMENTS: 'transit-documents',
   USER_MANAGEMENT: 'user-management',
+  PAGE_MANAGEMENT: 'page-management',
   SETTINGS: 'settings',
   LOGS: 'logs',
   COURIER_DELIVERED: 'courier-delivered',
@@ -17,9 +18,31 @@ export const PAGE_KEYS = {
 
 export type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
 
-/** Tüm kullanıcıların erişebildiği sayfalar */
-export const PUBLIC_PAGES: readonly PageKey[] = [
+/**
+ * Projede gerçekten tanımlı olan (menüde/route'ta var olan) sayfa anahtarları.
+ * Sayfa yönetimi ve izin ataması sadece bu listeye göre yapılır.
+ * Yeni route eklendiğinde bu listeye eklenmeli.
+ */
+export const MENU_PAGE_KEYS: readonly PageKey[] = [
   PAGE_KEYS.DASHBOARD,
+  PAGE_KEYS.USER_MANAGEMENT,
+  PAGE_KEYS.PAGE_MANAGEMENT,
+  PAGE_KEYS.COURIER_DELIVERED,
+  PAGE_KEYS.COURIER_NOT_DELIVERED
+] as const
+
+export type MenuPageKey = (typeof MENU_PAGE_KEYS)[number]
+
+/** İzin kontrolü gerektirmeyen sayfalar (her zaman erişilebilir; Ana Sayfa, Login) */
+export const PUBLIC_PAGES: readonly PageKey[] = [PAGE_KEYS.DASHBOARD] as const
+
+/**
+ * İzin listesinde yer alan sayfalar (rol varsayılanları, atanabilir sayfalar).
+ * Public sayfalar dahil edilmez; sadece izinle erişilen sayfalar.
+ */
+export const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
+  PAGE_KEYS.USER_MANAGEMENT,
+  PAGE_KEYS.PAGE_MANAGEMENT,
   PAGE_KEYS.COURIER_DELIVERED,
   PAGE_KEYS.COURIER_NOT_DELIVERED
 ] as const
