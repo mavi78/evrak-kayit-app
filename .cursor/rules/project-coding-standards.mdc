@@ -57,8 +57,8 @@ Bir istek geldiğinde şu adımlar izlenecek:
 4. **Onay**: Yapılacak değişiklikler kısaca özetlenip kullanıcıdan onay alınır.
 5. **Uygulama**: Onay alındıktan sonra kodlama başlar.
 6. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
-   - **TypeCheck**: `npx tsc --noEmit` komutu çalıştırılarak tip hataları kontrol edilecek.
-   - **Lint**: `npx eslint .` komutu çalıştırılarak lint hataları kontrol edilecek.
+   - **TypeCheck**: `npm run typecheck` komutu çalıştırılarak tip hataları kontrol edilecek. (Proje iki tsconfig kullanır: `tsconfig.node.json` — Main/Preload/Shared, `tsconfig.web.json` — Renderer/Shared. Tek `npx tsc --noEmit` çalışmaz.)
+   - **Lint**: `npm run lint` komutu çalıştırılarak lint hataları kontrol edilecek.
    - Hata bulunursa düzeltilmeden işlem tamamlanmış sayılmayacak.
 
 Belirsiz veya birden fazla yaklaşım mümkünse, AskQuestion ile seçenekler sunulacak.

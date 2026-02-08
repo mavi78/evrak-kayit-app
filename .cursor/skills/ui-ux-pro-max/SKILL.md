@@ -221,10 +221,10 @@ These are frequently overlooked issues that make UI look unprofessional:
 
 | Rule | Do | Don't |
 |------|----|----- |
-| **No emoji icons** | Use SVG icons (Heroicons, Lucide, Simple Icons) | Use emojis like 🎨 🚀 ⚙️ as UI icons |
+| **No emoji icons** | Use SVG icons (`@tabler/icons-react` — bu projede standart) | Use emojis like 🎨 🚀 ⚙️ as UI icons |
 | **Stable hover states** | Use color/opacity transitions on hover | Use scale transforms that shift layout |
 | **Correct brand logos** | Research official SVG from Simple Icons | Guess or use incorrect logo paths |
-| **Consistent icon sizing** | Use fixed viewBox (24x24) with w-6 h-6 | Mix different icon sizes randomly |
+| **Consistent icon sizing** | Use fixed size prop (örn. `size={20} stroke={1.5}`) with consistent values | Mix different icon sizes randomly |
 
 ### Interaction & Cursor
 
@@ -259,10 +259,10 @@ Before delivering UI code, verify these items:
 
 ### Visual Quality
 - [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
+- [ ] All icons from `@tabler/icons-react` (bu projede standart ikon seti)
 - [ ] Brand logos are correct (verified from Simple Icons)
 - [ ] Hover states don't cause layout shift
-- [ ] Use theme colors directly (bg-primary) not var() wrapper
+- [ ] Mantine tema renkleri (`theme.colors.deniz`, vb.) veya Mantine `color` prop'u kullanılır
 
 ### Interaction
 - [ ] All clickable elements have `cursor-pointer`
@@ -278,9 +278,9 @@ Before delivering UI code, verify these items:
 
 ### Layout
 - [ ] Floating elements have proper spacing from edges
-- [ ] No content hidden behind fixed navbars
-- [ ] Responsive at 375px, 768px, 1024px, 1440px
-- [ ] No horizontal scroll on mobile
+- [ ] No content hidden behind fixed navbars/headers
+- [ ] Electron masaüstü: minimum pencere boyutu 1024×700; frameless pencere başlığı (AppHeader) doğru çalışıyor
+- [ ] Sidebar daraltılabilir (collapsed) modda tooltip'ler doğru görünüyor
 
 ### Accessibility
 - [ ] All images have alt text

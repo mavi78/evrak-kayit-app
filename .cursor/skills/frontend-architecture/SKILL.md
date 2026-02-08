@@ -207,7 +207,7 @@ export function YourProvider({ children }: { children: ReactNode }): React.JSX.E
 ```typescript
 // src/renderer/src/hooks/useYour.ts
 import { useContext } from 'react'
-import { YourContext, type YourContextValue } from '@renderer/context/YourContext'
+import { YourContext, type YourContextValue } from '@renderer/context'  // ← Barrel import
 
 export function useYour(): YourContextValue {
   const context = useContext(YourContext)
@@ -217,6 +217,8 @@ export function useYour(): YourContextValue {
   return context
 }
 ```
+
+> **Not:** Tüm context import'ları `@renderer/context` barrel'inden yapılır. Dosya adları arasında çözümleyici karışıklığını önlemek için context tanımı (createContext, reducer, tipler) `{modul}-context-def.ts`, provider bileşeni `{Modul}Context.tsx` dosyasında tutulur.
 
 ---
 

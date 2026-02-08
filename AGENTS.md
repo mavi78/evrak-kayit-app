@@ -30,6 +30,7 @@ Aşağıdaki kural dosyaları her zaman geçerlidir. Her konuşma başlangıcın
 | Backend, servis, veritabanı | `.cursor/skills/backend-architecture/SKILL.md` | Main process, repository, servis kodu yazılırken |
 | Frontend, React, sayfa | `.cursor/skills/frontend-architecture/SKILL.md` | Renderer process, sayfa, hook, context yazılırken |
 | IPC, preload, ortak tipler | `.cursor/skills/shared-contracts/SKILL.md` | IPC kanalı, tip tanımı, preload bridge düzenlenirken |
+| Git, commit, push, GitHub | `.cursor/skills/github-turkish-commit/SKILL.md` | Kod GitHub'a yüklenirken, commit atılırken, push edilirken |
 
 ### Skill Şablonları
 

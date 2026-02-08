@@ -49,7 +49,7 @@ db.prepare('SELECT * FROM users').all()
 - Standart CRUD override edilecekse `handleCreate`, `handleUpdate`, `handleDelete` kullanılır.
 - Özel IPC kanalları `getCustomHandlers()` ile eklenir.
 - **Validation serviste yapılır, repository'de değil.**
-- State değiştiren her işlem (create, update, delete) **audit log** kaydı oluşturur.
+- State değiştiren işlemlerde (create, update, delete) **audit log** kaydı oluşturulması önerilir. Auth modülünde uygulanmıştır; yeni modüllerde ihtiyaca göre eklenir.
 
 ```typescript
 // ✅ DOĞRU — Validasyon serviste
@@ -90,7 +90,14 @@ console.error('Operation failed')
 - Rol hiyerarşisi her state-changing işlemde kontrol edilir.
 - `ServiceManager` üzerinden kaydedilmeyen servis IPC'ye bağlanamaz.
 
-## 6. Dosya Başlık Bloğu — Zorunlu
+## 6. Sistem Seviye IPC (ServiceManager Dışı)
+
+Pencere kontrolü (`app:window-minimize`, `app:window-maximize`, vb.) ve splash ekranı kanalları (`app:loading-progress`, `app:backend-ready`) `src/main/index.ts` içinde doğrudan `ipcMain.handle()` ile kaydedilir. Bu kanallar ServiceManager üzerinden geçmez.
+
+- **YASAK**: Modül iş mantığını `index.ts` içine koymak — modüller ServiceManager üzerinden kayıt edilir.
+- **YASAK**: Sistem kanallarında veritabanı veya iş mantığı işlemi yapmak.
+
+## 7. Dosya Başlık Bloğu — Zorunlu
 
 Her `.ts` dosyası açıklama bloğu ile başlar:
 

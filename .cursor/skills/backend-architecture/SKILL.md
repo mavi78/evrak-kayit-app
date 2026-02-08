@@ -34,9 +34,6 @@ import { BaseRepository } from '@main/core/BaseRepository'
 import type { YourEntity } from '@shared/types'
 
 export class YourRepository extends BaseRepository<YourEntity> {
-  // Boolean kolonlar varsa tanımla
-  private readonly customBoolCols = ['is_completed'] as const
-
   protected getTableName(): string {
     return 'your_table'
   }

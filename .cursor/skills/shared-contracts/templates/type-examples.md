@@ -176,12 +176,23 @@ export * from './auth.types'
 
 export const PAGE_KEYS = {
   DASHBOARD: 'dashboard',
-  // ... mevcut anahtarlar ...
-  YOUR_MODULE: 'your-module',  // ← Yeni satır
+  INCOMING_DOCUMENTS: 'incoming-documents',
+  OUTGOING_DOCUMENTS: 'outgoing-documents',
+  TRANSIT_DOCUMENTS: 'transit-documents',
+  USER_MANAGEMENT: 'user-management',
+  SETTINGS: 'settings',
+  LOGS: 'logs',
+  COURIER_DELIVERED: 'courier-delivered',
+  COURIER_NOT_DELIVERED: 'courier-not-delivered',
+  // YOUR_MODULE: 'your-module',  // ← Yeni modül eklerken buraya satır ekle
 } as const
 
 // Gerekirse erişim kurallarına ekle:
-export const PUBLIC_PAGES: readonly PageKey[] = [PAGE_KEYS.DASHBOARD] as const
+export const PUBLIC_PAGES: readonly PageKey[] = [
+  PAGE_KEYS.DASHBOARD,
+  PAGE_KEYS.COURIER_DELIVERED,
+  PAGE_KEYS.COURIER_NOT_DELIVERED
+] as const
 
 export const SUPERADMIN_ONLY_PAGES: readonly PageKey[] = [
   PAGE_KEYS.USER_MANAGEMENT,

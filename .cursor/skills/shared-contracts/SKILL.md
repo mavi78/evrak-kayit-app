@@ -199,7 +199,9 @@ const PAGE_KEYS = {
   TRANSIT_DOCUMENTS: 'transit-documents',
   USER_MANAGEMENT: 'user-management',
   SETTINGS: 'settings',
-  LOGS: 'logs'
+  LOGS: 'logs',
+  COURIER_DELIVERED: 'courier-delivered',
+  COURIER_NOT_DELIVERED: 'courier-not-delivered'
 } as const
 
 type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
@@ -209,7 +211,7 @@ type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
 
 | Sabit | Açıklama | Sayfalar |
 |-------|----------|----------|
-| `PUBLIC_PAGES` | Herkes erişebilir | dashboard |
+| `PUBLIC_PAGES` | Herkes erişebilir | dashboard, courier-delivered, courier-not-delivered |
 | `SUPERADMIN_ONLY_PAGES` | Sadece superadmin | user-management, settings, logs |
 | Diğer | İzin tablosundan kontrol | incoming/outgoing/transit docs |
 

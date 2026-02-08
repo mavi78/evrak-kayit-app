@@ -121,4 +121,13 @@ alert('İşlem başarılı!')
 - Tekrar eden mantık custom hook'a çıkarılır.
 - Hook isimleri `use` prefix'i ile başlar.
 - Hook'lar `hooks/` klasöründe tutulur.
-- **YASAK**: `useEffect` içinde doğrudan API çağrısı — custom hook üzerinden yapılır.
+- Sayfa bileşenlerinde `useEffect` + `useCallback` ile API çağrısı yapılabilir (standart veri çekme kalıbı).
+- **YASAK**: Aynı API çağrı mantığı birden fazla sayfada tekrarlanıyorsa custom hook'a çıkarılmadan bırakılması — ortak mantık `hooks/` altında paylaşılır.
+
+## 8. Route ve Menü Yapısı
+
+- Route tanımları `router/routes.ts` dosyasında merkezi tutulur.
+- `RouteConfig.children` ile hiyerarşik menü grupları desteklenir (örn. "Kurye İşlemleri" > "Teslim edilen").
+- `flattenRoutes()` yardımcısı ağaç yapısını router için düz listeye dönüştürür.
+- Yeni sayfa bileşenleri `lazy()` ile yüklenir — `const Page = lazy(() => import(...))`.
+- Sidebar ikon eşleştirmesi `AppSidebar.tsx` > `PAGE_ICONS` nesnesine eklenir.

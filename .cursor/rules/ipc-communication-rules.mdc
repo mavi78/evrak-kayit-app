@@ -80,13 +80,35 @@ interface ServiceResponse<T = null> {
 - Sabitler `constants.ts` içinde `UPPER_SNAKE_CASE` ile tanımlanır.
 - Tüm utils `src/shared/utils/index.ts` üzerinden dışa aktarılır.
 
-## 6. Yeni Modül Ekleme Kontrol Listesi
+## 6. Sistem Seviye IPC Kanalları (`app:` Namespace)
+
+Modül kanalları dışında, uygulama yaşam döngüsü ve pencere kontrolü için `app:` önekli sistem kanalları kullanılır. Bu kanallar `src/main/index.ts` içinde doğrudan `ipcMain.handle()` ile kaydedilir (ServiceManager dışı):
+
+| Kanal | Yön | Açıklama |
+|-------|-----|----------|
+| `app:window-minimize` | Renderer → Main | Pencere küçültme |
+| `app:window-maximize` | Renderer → Main | Pencere büyütme / geri alma |
+| `app:window-close` | Renderer → Main | Pencere kapatma |
+| `app:window-get-state` | Renderer → Main | Pencere durumu sorgulama (isMaximized) |
+| `app:window-state-changed` | Main → Renderer | Pencere durumu değişikliği (maximize/unmaximize) |
+| `app:loading-progress` | Main → Renderer | Splash ekranı yükleme ilerlemesi |
+| `app:backend-ready` | Main → Renderer | Backend başlatma tamamlandı sinyali |
+
+- `app:` kanallarına yeni kanal eklenecekse `src/main/index.ts` ve `src/shared/types/app.types.ts` dosyaları güncellenir.
+- **YASAK**: Modül iş mantığını `app:` kanallarına koymak — modül kanalları ServiceManager üzerinden kayıt edilir.
+
+## 7. Yeni Modül Ekleme Kontrol Listesi
 
 Yeni bir modül eklenirken aşağıdaki adımlar **sırasıyla** takip edilir:
 
-1. `src/shared/types/{modul}.types.ts` — Tip tanımları oluştur, `index.ts`'e ekle
-2. `src/main/modules/{modul}/` — Repository ve Service oluştur
-3. `src/main/index.ts` — ServiceManager'a kaydet
-4. `src/renderer/src/lib/api.ts` — API fonksiyonlarını ekle
-5. `src/renderer/src/pages/{modul}/` — Sayfa bileşenini oluştur
-6. `src/renderer/src/router/routes.ts` — Route tanımını ekle
+1. `src/shared/types/{modul}.types.ts` — Tip tanımları oluştur
+2. `src/shared/types/index.ts` — Barrel export'a ekle
+3. `src/shared/utils/constants.ts` — PAGE_KEYS'e sayfa anahtarı ekle (gerekirse)
+4. `src/main/modules/{modul}/` — Repository ve Service oluştur
+5. `src/main/index.ts` — `serviceManager.register(new YourService())` ile kaydet
+6. `src/renderer/src/lib/api.ts` — API fonksiyonlarını ekle
+7. `src/renderer/src/pages/{modul}/` — Sayfa bileşenini oluştur
+8. `src/renderer/src/router/routes.ts` — Route tanımını ekle
+9. `src/renderer/src/components/layout/AppSidebar.tsx` — PAGE_ICONS'a ikon eşleştirmesi ekle
+10. `npm run typecheck` — Tip hatası kontrolü
+11. `npm run lint` — Lint kontrolü
