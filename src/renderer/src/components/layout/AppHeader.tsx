@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { Group, Text, Button, Badge, Box, ActionIcon, Tooltip } from '@mantine/core'
+import { Group, Text, Button, Box, ActionIcon, Tooltip } from '@mantine/core'
 import {
   IconLogout,
   IconUser,
@@ -14,18 +14,6 @@ import {
   IconX
 } from '@tabler/icons-react'
 import { useAuth } from '@renderer/hooks/useAuth'
-
-const ROLE_LABELS: Record<string, string> = {
-  superadmin: 'Süper Yönetici',
-  admin: 'Yönetici',
-  user: 'Kullanıcı'
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  superadmin: 'red',
-  admin: 'blue',
-  user: 'gray'
-}
 
 /** Pencere kontrolü: min / max-restore / close — ikon pencere durumuna göre değişir */
 function WindowControls(): React.JSX.Element {
@@ -133,15 +121,19 @@ export function AppHeader(): React.JSX.Element {
       <Group gap="sm" style={{ WebkitAppRegion: 'no-drag', color: 'var(--mantine-color-white)' }}>
         {state.user && (
           <>
-            <Group gap="xs" c="white">
-              <IconUser size={18} stroke={1.5} />
-              <Text size="sm" fw={500} c="white">
-                {state.user.full_name}
-              </Text>
+            <Group gap="sm" c="white" align="center">
+              <IconUser size={18} stroke={1.5} style={{ flexShrink: 0 }} />
+              <Box>
+                <Text size="sm" fw={500} c="white" lh={1.2}>
+                  {state.user.full_name}
+                </Text>
+                {state.user.rutbe ? (
+                  <Text size="xs" c="white" opacity={0.9} lh={1.3} fs="italic" style={{ fontSize: '0.7rem' }}>
+                    {state.user.rutbe}
+                  </Text>
+                ) : null}
+              </Box>
             </Group>
-            <Badge color={ROLE_COLORS[state.user.role]} variant="light" size="sm">
-              {ROLE_LABELS[state.user.role]}
-            </Badge>
             <Tooltip label="Oturumu kapat" position="bottom">
               <Button
                 variant="subtle"

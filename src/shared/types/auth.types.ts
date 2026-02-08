@@ -6,11 +6,20 @@
 
 import type { BaseEntity, UserRole } from './common.types'
 
+/** TC Kimlik No: tam 11 rakam */
+export const TC_KIMLIK_NO_LENGTH = 11
+
+/** Şifre kuralları: en az 8 karakter, en az bir büyük ve bir küçük harf */
+export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_UPPERCASE_REGEX = /[A-ZÇĞİÖŞÜ]/
+export const PASSWORD_LOWERCASE_REGEX = /[a-zçğıöşü]/
+
 /** Kullanıcı entity'si */
 export interface User extends BaseEntity {
-  username: string
+  tc_kimlik_no: string
   password: string
   full_name: string
+  rutbe: string
   role: UserRole
   is_active: boolean
 }
@@ -28,8 +37,9 @@ export interface PagePermission extends Omit<BaseEntity, 'updated_at'> {
 
 // ---- Request Tipleri ----
 
+/** Giriş isteği: 11 haneli TC Kimlik No ve şifre */
 export interface LoginRequest {
-  username: string
+  tc_kimlik_no: string
   password: string
 }
 
@@ -39,15 +49,17 @@ export interface LoginResponse {
 }
 
 export interface CreateUserRequest {
-  username: string
+  tc_kimlik_no: string
   password: string
   full_name: string
+  rutbe: string
   role: UserRole
 }
 
 export interface UpdateUserRequest {
   id: number
   full_name?: string
+  rutbe?: string
   role?: UserRole
   is_active?: boolean
 }

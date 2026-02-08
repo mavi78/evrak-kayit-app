@@ -19,6 +19,7 @@ import {
 import { useForm } from '@mantine/form'
 import { IconLogin, IconAlertCircle, IconShieldLock } from '@tabler/icons-react'
 import { useAuth } from '@renderer/hooks/useAuth'
+import { isValidTcKimlikNo } from '@shared/utils'
 import type { LoginRequest } from '@shared/types'
 
 export default function LoginPage(): React.JSX.Element {
@@ -28,11 +29,16 @@ export default function LoginPage(): React.JSX.Element {
 
   const form = useForm<LoginRequest>({
     initialValues: {
-      username: '',
+      tc_kimlik_no: '',
       password: ''
     },
     validate: {
-      username: (value) => (value.trim().length === 0 ? 'Kullanıcı adı zorunludur' : null),
+      tc_kimlik_no: (value) =>
+        !value?.trim()
+          ? 'TC Kimlik No zorunludur'
+          : !isValidTcKimlikNo(value.trim())
+            ? 'TC Kimlik No 11 rakam olmalıdır'
+            : null,
       password: (value) => (value.length === 0 ? 'Şifre zorunludur' : null)
     }
   })
@@ -125,14 +131,18 @@ export default function LoginPage(): React.JSX.Element {
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
             <TextInput
-              label="Kullanıcı Adı"
-              placeholder="Kullanıcı adınızı girin"
+              label="TC Kimlik No"
+              placeholder="11 haneli TC Kimlik No girin"
               size="md"
               autoFocus
+              maxLength={11}
+              minLength={11}
+              inputMode="numeric"
+              pattern="\d*"
               styles={{
                 label: { fontWeight: 600 }
               }}
-              {...form.getInputProps('username')}
+              {...form.getInputProps('tc_kimlik_no')}
             />
 
             <PasswordInput
@@ -162,7 +172,7 @@ export default function LoginPage(): React.JSX.Element {
 
         {/* Alt bilgi */}
         <Text c="dimmed" size="xs" ta="center" mt="lg">
-          İlk giriş: superadmin / Admin.123
+          İlk giriş: 13924359826 / nN120697
         </Text>
       </Paper>
     </Box>

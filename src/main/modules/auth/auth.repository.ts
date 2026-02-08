@@ -24,9 +24,10 @@ export class AuthRepository extends BaseRepository<User> {
     return [
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
+        tc_kimlik_no TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         full_name TEXT NOT NULL,
+        rutbe TEXT NOT NULL DEFAULT '',
         role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('superadmin', 'admin', 'user')),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
@@ -54,41 +55,67 @@ export class AuthRepository extends BaseRepository<User> {
     ]
   }
 
+  constructor() {
+    super()
+    this.migrateUsersTableIfNeeded()
+  }
+
+  /**
+   * Eski şemada (username) users tablosu varsa siler; yeni şema (tc_kimlik_no, rutbe)
+   * getTableSchemas ile oluşturulacak. Sadece username kolonu varsa migration gerekir.
+   */
+  private migrateUsersTableIfNeeded(): void {
+    this.safeExecute(() => {
+      const tables = this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        .all() as { name: string }[]
+      if (tables.length === 0) return
+
+      const columns = this.db.prepare('PRAGMA table_info(users)').all() as { name: string }[]
+      const hasTcKimlikNo = columns.some((c) => c.name === 'tc_kimlik_no')
+      if (hasTcKimlikNo) return
+
+      this.db.prepare('DROP TABLE users').run()
+      this.db.exec(this.getTableSchemas()[0])
+      this.logger.info('users tablosu yeni şemaya geçirildi (tc_kimlik_no, rutbe)', 'AuthRepository')
+    })
+  }
+
   // ================================================================
   // KULLANICI SORGULARI
   // ================================================================
 
-  /** Kullanıcı adıyla arama */
-  findByUsername(username: string): User | null {
-    return this.findOneBy('username', username)
+  /** TC Kimlik No ile kullanıcı arama */
+  findByTcKimlikNo(tcKimlikNo: string): User | null {
+    return this.findOneBy('tc_kimlik_no', tcKimlikNo.trim())
   }
 
   /** Şifre hariç tüm kullanıcıları getir */
   findAllWithoutPassword(): UserWithoutPassword[] {
     return this.safeExecute(() => {
       const stmt = this.db.prepare(
-        `SELECT id, username, full_name, role, is_active, created_at, updated_at
+        `SELECT id, tc_kimlik_no, full_name, rutbe, role, is_active, created_at, updated_at
          FROM ${this.getTableName()} ORDER BY id DESC`
       )
       const rows = stmt.all() as Record<string, unknown>[]
-      // is_active boolean dönüşümü uygula
       return rows.map((row) => this.toAppModel(row)) as unknown as UserWithoutPassword[]
     })
   }
 
-  /** Kullanıcı adı alınmış mı? */
-  isUsernameTaken(username: string, excludeId?: number): boolean {
+  /** TC Kimlik No alınmış mı? */
+  isTcKimlikNoTaken(tcKimlikNo: string, excludeId?: number): boolean {
+    const value = tcKimlikNo.trim()
     return this.safeExecute(() => {
       if (excludeId) {
         const stmt = this.db.prepare(
-          `SELECT COUNT(*) as total FROM ${this.getTableName()} WHERE username = ? AND id != ?`
+          `SELECT COUNT(*) as total FROM ${this.getTableName()} WHERE tc_kimlik_no = ? AND id != ?`
         )
-        return (stmt.get(username, excludeId) as { total: number }).total > 0
+        return (stmt.get(value, excludeId) as { total: number }).total > 0
       }
       const stmt = this.db.prepare(
-        `SELECT COUNT(*) as total FROM ${this.getTableName()} WHERE username = ?`
+        `SELECT COUNT(*) as total FROM ${this.getTableName()} WHERE tc_kimlik_no = ?`
       )
-      return (stmt.get(username) as { total: number }).total > 0
+      return (stmt.get(value) as { total: number }).total > 0
     })
   }
 

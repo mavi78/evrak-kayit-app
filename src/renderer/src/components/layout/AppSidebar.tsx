@@ -33,6 +33,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@renderer/hooks/useAuth'
 import { routes, type RouteConfig } from '@renderer/router/routes'
 import type { PageKey } from '@shared/utils'
+import type { UserRole } from '@shared/types'
 
 const MIN_TOUCH_TARGET = 44
 const HOVER_TRANSITION_MS = 200
@@ -59,7 +60,7 @@ interface AppSidebarProps {
 function isRouteVisible(
   route: RouteConfig,
   hasPageAccess: (key: PageKey) => boolean,
-  hasMinimumRole: (role: string) => boolean
+  hasMinimumRole: (role: UserRole) => boolean
 ): boolean {
   if (!route.showInSidebar) return false
   if (route.minimumRole && !hasMinimumRole(route.minimumRole)) return false
@@ -71,7 +72,7 @@ function isRouteVisible(
 function getVisibleMenuItems(
   configs: RouteConfig[],
   hasPageAccess: (key: PageKey) => boolean,
-  hasMinimumRole: (role: string) => boolean
+  hasMinimumRole: (role: UserRole) => boolean
 ): RouteConfig[] {
   const result: RouteConfig[] = []
   for (const r of configs) {

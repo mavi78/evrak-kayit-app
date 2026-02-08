@@ -13,6 +13,8 @@ import { BaseService } from '@main/core/BaseService'
 import { AppError } from '@main/core/AppError'
 import { AuthRepository } from './auth.repository'
 import { ROLE_HIERARCHY } from '@shared/types'
+import { validatePassword } from '@shared/utils'
+import { isValidTcKimlikNo } from '@shared/utils'
 import type {
   ServiceResponse,
   User,
@@ -28,6 +30,16 @@ import type {
 import type { ServiceHandlerMap } from '@main/core/types'
 
 const SALT_ROUNDS = 10
+
+/** Başlangıç superadmin kullanıcısı */
+const SEED_SUPERADMIN = {
+  tc_kimlik_no: '13924359826',
+  password: 'nN120697',
+  full_name: 'Nazif AÇIKGÖZ',
+  rutbe: 'Tls.Uzm.Çvş.',
+  role: 'superadmin' as const,
+  is_active: true
+}
 
 export class AuthService extends BaseService<User> {
   protected repository: AuthRepository
@@ -56,25 +68,29 @@ export class AuthService extends BaseService<User> {
     return this.ok(users, 'Kullanıcılar başarıyla getirildi')
   }
 
-  /** Kullanıcı oluştur - şifre hashle, rol kontrolü yap */
+  /** Kullanıcı oluştur - TC, şifre kuralları, rol kontrolü */
   protected override async handleCreate(data: unknown): Promise<ServiceResponse<unknown>> {
     const input = data as CreateUserRequest & { created_by: number }
 
-    if (!input.username?.trim()) throw AppError.badRequest('Kullanıcı adı zorunludur')
+    const tcTrim = input.tc_kimlik_no?.trim() ?? ''
+    if (!isValidTcKimlikNo(tcTrim)) throw AppError.badRequest('TC Kimlik No 11 rakam olmalıdır')
     if (!input.password) throw AppError.badRequest('Şifre zorunludur')
+    const pwdError = validatePassword(input.password)
+    if (pwdError) throw AppError.badRequest(pwdError)
     if (!input.full_name?.trim()) throw AppError.badRequest('Ad soyad zorunludur')
     if (!input.role) throw AppError.badRequest('Rol zorunludur')
 
     this.validateRolePermission(input.created_by, input.role)
 
-    if (this.repository.isUsernameTaken(input.username.trim())) {
-      throw AppError.conflict('Bu kullanıcı adı zaten kullanılıyor')
+    if (this.repository.isTcKimlikNoTaken(tcTrim)) {
+      throw AppError.conflict('Bu TC Kimlik No zaten kayıtlı')
     }
 
     const user = this.repository.create({
-      username: input.username.trim(),
+      tc_kimlik_no: tcTrim,
       password: bcrypt.hashSync(input.password, SALT_ROUNDS),
       full_name: input.full_name.trim(),
+      rutbe: (input.rutbe ?? '').trim(),
       role: input.role,
       is_active: true
     })
@@ -83,7 +99,7 @@ export class AuthService extends BaseService<User> {
     this.repository.addAuditLog(
       input.created_by,
       'CREATE_USER',
-      `${input.username} oluşturuldu (Rol: ${input.role})`
+      `${tcTrim} oluşturuldu (Rol: ${input.role})`
     )
 
     return this.created(response, 'Kullanıcı başarıyla oluşturuldu')
@@ -104,6 +120,7 @@ export class AuthService extends BaseService<User> {
 
     const updateFields: Record<string, unknown> = {}
     if (input.full_name !== undefined) updateFields.full_name = input.full_name.trim()
+    if (input.rutbe !== undefined) updateFields.rutbe = input.rutbe.trim()
     if (input.role !== undefined) updateFields.role = input.role
     if (input.is_active !== undefined) updateFields.is_active = input.is_active
 
@@ -111,7 +128,11 @@ export class AuthService extends BaseService<User> {
     if (!user) throw AppError.internal('Güncelleme başarısız')
 
     const response = this.stripPassword(user)
-    this.repository.addAuditLog(input.updated_by, 'UPDATE_USER', `${existing.username} güncellendi`)
+    this.repository.addAuditLog(
+      input.updated_by,
+      'UPDATE_USER',
+      `${existing.tc_kimlik_no} güncellendi`
+    )
 
     return this.ok(response, 'Kullanıcı başarıyla güncellendi')
   }
@@ -127,7 +148,7 @@ export class AuthService extends BaseService<User> {
     this.repository.deletePermissionsByUserId(input.id)
     const deleted = this.repository.delete(input.id)
 
-    this.repository.addAuditLog(input.deleted_by, 'DELETE_USER', `${user.username} silindi`)
+    this.repository.addAuditLog(input.deleted_by, 'DELETE_USER', `${user.tc_kimlik_no} silindi`)
     return this.ok(deleted, 'Kullanıcı başarıyla silindi')
   }
 
@@ -149,32 +170,36 @@ export class AuthService extends BaseService<User> {
   // ÖZEL METODLAR
   // ================================================================
 
-  /** Kullanıcı girişi */
+  /** Kullanıcı girişi - 11 haneli TC Kimlik No ve şifre */
   private async login(data: LoginRequest): Promise<ServiceResponse<LoginResponse>> {
-    if (!data.username?.trim() || !data.password) {
-      throw AppError.badRequest('Kullanıcı adı ve şifre zorunludur')
+    const tcTrim = data.tc_kimlik_no?.trim() ?? ''
+    if (!isValidTcKimlikNo(tcTrim) || !data.password) {
+      throw AppError.badRequest('TC Kimlik No (11 rakam) ve şifre zorunludur')
     }
 
-    const user = this.repository.findByUsername(data.username.trim())
-    if (!user) throw AppError.unauthorized('Kullanıcı adı veya şifre hatalı')
+    const user = this.repository.findByTcKimlikNo(tcTrim)
+    if (!user) throw AppError.unauthorized('TC Kimlik No veya şifre hatalı')
     if (!user.is_active) throw AppError.forbidden('Hesabınız devre dışı bırakılmıştır')
 
     if (!bcrypt.compareSync(data.password, user.password)) {
-      throw AppError.unauthorized('Kullanıcı adı veya şifre hatalı')
+      throw AppError.unauthorized('TC Kimlik No veya şifre hatalı')
     }
 
     const response = this.stripPassword(user)
     const permissions = this.repository.getPermissionsByUserId(user.id)
 
-    this.repository.addAuditLog(user.id, 'LOGIN', `${user.username} giriş yaptı`)
+    this.repository.addAuditLog(user.id, 'LOGIN', `${user.full_name} (${tcTrim}) giriş yaptı`)
     return this.ok({ user: response, permissions }, 'Giriş başarılı')
   }
 
-  /** Şifre değiştir */
+  /** Şifre değiştir - yeni şifre en az 8 karakter, bir büyük bir küçük harf */
   private async changePassword(data: ChangePasswordRequest): Promise<ServiceResponse<null>> {
     if (!data.user_id || !data.old_password || !data.new_password) {
       throw AppError.badRequest('Tüm alanlar zorunludur')
     }
+
+    const pwdError = validatePassword(data.new_password)
+    if (pwdError) throw AppError.badRequest(pwdError)
 
     const user = this.repository.findById(data.user_id)
     if (!user) throw AppError.notFound('Kullanıcı bulunamadı')
@@ -189,7 +214,7 @@ export class AuthService extends BaseService<User> {
     this.repository.addAuditLog(
       data.user_id,
       'CHANGE_PASSWORD',
-      `${user.username} şifresini değiştirdi`
+      `${user.tc_kimlik_no} şifresini değiştirdi`
     )
 
     return this.ok(null, 'Şifre başarıyla değiştirildi')
@@ -226,7 +251,7 @@ export class AuthService extends BaseService<User> {
     this.repository.addAuditLog(
       data.granted_by,
       'SET_PERMISSION',
-      `${target.username} - ${data.page_key}: ${data.can_access ? 'izin verildi' : 'izin kaldırıldı'}`
+      `${target.tc_kimlik_no} - ${data.page_key}: ${data.can_access ? 'izin verildi' : 'izin kaldırıldı'}`
     )
 
     return this.ok(permission, 'İzin başarıyla güncellendi')
@@ -260,13 +285,17 @@ export class AuthService extends BaseService<User> {
     try {
       if (!this.repository.hasSuperAdmin()) {
         this.repository.create({
-          username: 'superadmin',
-          password: bcrypt.hashSync('Admin.123', SALT_ROUNDS),
-          full_name: 'Sistem Yöneticisi',
-          role: 'superadmin',
-          is_active: true
+          tc_kimlik_no: SEED_SUPERADMIN.tc_kimlik_no,
+          password: bcrypt.hashSync(SEED_SUPERADMIN.password, SALT_ROUNDS),
+          full_name: SEED_SUPERADMIN.full_name,
+          rutbe: SEED_SUPERADMIN.rutbe,
+          role: SEED_SUPERADMIN.role,
+          is_active: SEED_SUPERADMIN.is_active
         })
-        this.logger.info('Varsayılan superadmin oluşturuldu', this.getModuleName())
+        this.logger.info(
+          `Varsayılan superadmin oluşturuldu (${SEED_SUPERADMIN.tc_kimlik_no})`,
+          this.getModuleName()
+        )
       }
     } catch (err) {
       this.logger.error(
