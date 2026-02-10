@@ -30,13 +30,18 @@ export interface RouteConfig {
 // ---- Lazy loaded sayfa bileşenleri ----
 const DashboardPage = lazy(() => import('@renderer/pages/dashboard/DashboardPage'))
 const UserManagementPage = lazy(() => import('@renderer/pages/user-management/UserManagementPage'))
-const PageManagementPage = lazy(
-  () => import('@renderer/pages/page-management/PageManagementPage')
-)
+const PageManagementPage = lazy(() => import('@renderer/pages/page-management/PageManagementPage'))
 const CourierDeliveredPage = lazy(() => import('@renderer/pages/courier/CourierDeliveredPage'))
 const CourierNotDeliveredPage = lazy(
   () => import('@renderer/pages/courier/CourierNotDeliveredPage')
 )
+const UnitsPage = lazy(() => import('@renderer/pages/settings/units/UnitsPage'))
+const ClassificationsPage = lazy(
+  () => import('@renderer/pages/settings/classifications/ClassificationsPage')
+)
+const ChannelsPage = lazy(() => import('@renderer/pages/settings/channels/ChannelsPage'))
+const FoldersPage = lazy(() => import('@renderer/pages/settings/folders/FoldersPage'))
+const CategoriesPage = lazy(() => import('@renderer/pages/settings/categories/CategoriesPage'))
 
 /** Router'da kullanılan yaprak route (path + component zorunlu) */
 export type LeafRouteConfig = RouteConfig & {
@@ -89,6 +94,61 @@ export const routes: RouteConfig[] = [
     label: 'Sayfa Yönetimi',
     minimumRole: 'user',
     requiresPermission: true
+  },
+  {
+    path: '',
+    pageKey: 'settings-units',
+    showInSidebar: true,
+    label: 'Ayarlar',
+    minimumRole: 'user',
+    requiresPermission: true,
+    children: [
+      {
+        path: '/settings/units',
+        component: UnitsPage,
+        pageKey: 'settings-units',
+        showInSidebar: true,
+        label: 'Birlik Düzenleme',
+        minimumRole: 'user',
+        requiresPermission: true
+      },
+      {
+        path: '/settings/classifications',
+        component: ClassificationsPage,
+        pageKey: 'settings-classifications',
+        showInSidebar: true,
+        label: 'Gizlilik Derecesi',
+        minimumRole: 'user',
+        requiresPermission: true
+      },
+      {
+        path: '/settings/channels',
+        component: ChannelsPage,
+        pageKey: 'settings-channels',
+        showInSidebar: true,
+        label: 'Kanal Düzenleme',
+        minimumRole: 'user',
+        requiresPermission: true
+      },
+      {
+        path: '/settings/folders',
+        component: FoldersPage,
+        pageKey: 'settings-folders',
+        showInSidebar: true,
+        label: 'Klasör Düzenleme',
+        minimumRole: 'user',
+        requiresPermission: true
+      },
+      {
+        path: '/settings/categories',
+        component: CategoriesPage,
+        pageKey: 'settings-categories',
+        showInSidebar: true,
+        label: 'Kategori Düzenleme',
+        minimumRole: 'user',
+        requiresPermission: true
+      }
+    ]
   },
   {
     path: '',

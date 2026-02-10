@@ -144,7 +144,10 @@ export function AppHeader(): React.JSX.Element {
       changed_by: state.user.id,
       old_password: values.old_password
     })
-    handleApiResponse(response, { showSuccess: true, successMessage: 'Şifre başarıyla değiştirildi' })
+    handleApiResponse(response, {
+      showSuccess: true,
+      successMessage: 'Şifre başarıyla değiştirildi'
+    })
     if (response.success) {
       changePwdForm.reset()
       closeChangePwd()

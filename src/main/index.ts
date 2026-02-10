@@ -18,6 +18,11 @@ import { Database } from './database/Database'
 
 // Modüller
 import { AuthService } from './modules/auth/auth.service'
+import { UnitService } from './modules/unit/unit.service'
+import { ClassificationService } from './modules/classification/classification.service'
+import { ChannelService } from './modules/channel/channel.service'
+import { FolderService } from './modules/folder/folder.service'
+import { CategoryService } from './modules/category/category.service'
 
 import type { LoadingProgressPayload } from '@shared/types'
 
@@ -73,6 +78,11 @@ async function runBackendInit(splashWindow: BrowserWindow): Promise<ServiceManag
 
   const serviceManager = new ServiceManager()
   serviceManager.register(new AuthService())
+  serviceManager.register(new UnitService())
+  serviceManager.register(new ClassificationService())
+  serviceManager.register(new ChannelService())
+  serviceManager.register(new FolderService())
+  serviceManager.register(new CategoryService())
   serviceManager.initialize((moduleName) => {
     sendProgress(splashWindow, {
       step: 'service',

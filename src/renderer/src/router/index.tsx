@@ -13,9 +13,7 @@ import { useAuth } from '@renderer/hooks/useAuth'
 import { AppLayout } from '@renderer/components/layout/AppLayout'
 import LoginPage from '@renderer/pages/login/LoginPage'
 
-const ChangePasswordPage = lazy(
-  () => import('@renderer/pages/change-password/ChangePasswordPage')
-)
+const ChangePasswordPage = lazy(() => import('@renderer/pages/change-password/ChangePasswordPage'))
 
 /** Sayfa yüklenirken gösterilecek loading bileşeni */
 function PageLoader(): React.JSX.Element {

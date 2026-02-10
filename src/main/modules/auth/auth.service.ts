@@ -151,7 +151,9 @@ export class AuthService extends BaseService<User> {
     }
 
     if (actor.role === 'superadmin' && existing.role === 'superadmin') {
-      throw AppError.forbidden('Superadmin, superadmin rolündeki kullanıcılar üzerinde işlem yapamaz')
+      throw AppError.forbidden(
+        'Superadmin, superadmin rolündeki kullanıcılar üzerinde işlem yapamaz'
+      )
     }
     if (actor.role === 'admin') {
       if (existing.role !== 'user') {
@@ -210,7 +212,9 @@ export class AuthService extends BaseService<User> {
     if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
 
     if (user.role === 'superadmin' && actor.role !== 'system') {
-      throw AppError.forbidden('Superadmin kullanıcısı yalnızca sistem kullanıcısı tarafından silinebilir')
+      throw AppError.forbidden(
+        'Superadmin kullanıcısı yalnızca sistem kullanıcısı tarafından silinebilir'
+      )
     }
     if (actor.role === 'admin' && user.role !== 'user') {
       throw AppError.forbidden('Admin sadece user rolündeki kullanıcıları silebilir')
@@ -270,7 +274,10 @@ export class AuthService extends BaseService<User> {
 
     const response = this.stripPassword(user)
     const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
-    const roleVisibilityDefaults = this.buildRoleVisibilityDefaultsForUser(user.role, permissionKeysSet)
+    const roleVisibilityDefaults = this.buildRoleVisibilityDefaultsForUser(
+      user.role,
+      permissionKeysSet
+    )
 
     this.repository.addAuditLog(user.id, 'LOGIN', `${user.full_name} (${tcTrim}) giriş yaptı`)
     return this.ok(
@@ -321,10 +328,14 @@ export class AuthService extends BaseService<User> {
       )
     } else {
       if (target.role === 'system') {
-        throw AppError.forbidden('Sistem kullanıcısının şifresi yalnızca kendisi tarafından değiştirilebilir')
+        throw AppError.forbidden(
+          'Sistem kullanıcısının şifresi yalnızca kendisi tarafından değiştirilebilir'
+        )
       }
       if (target.role === 'superadmin' && actor.role !== 'system') {
-        throw AppError.forbidden('Superadmin kullanıcısının şifresi yalnızca kendisi tarafından değiştirilebilir')
+        throw AppError.forbidden(
+          'Superadmin kullanıcısının şifresi yalnızca kendisi tarafından değiştirilebilir'
+        )
       }
       if (actor.role === 'admin' && target.role !== 'user') {
         throw AppError.forbidden('Admin sadece kullanıcı rolündekilerin şifresini değiştirebilir')
@@ -437,7 +448,10 @@ export class AuthService extends BaseService<User> {
 
     const response = this.stripPassword(user)
     const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
-    const roleVisibilityDefaults = this.buildRoleVisibilityDefaultsForUser(user.role, permissionKeysSet)
+    const roleVisibilityDefaults = this.buildRoleVisibilityDefaultsForUser(
+      user.role,
+      permissionKeysSet
+    )
 
     return this.ok(
       {
@@ -473,7 +487,9 @@ export class AuthService extends BaseService<User> {
     const actor = this.repository.findById(data.set_by)
     if (!actor) throw AppError.notFound('İşlemi yapan kullanıcı bulunamadı')
     if (actor.role !== 'system') {
-      throw AppError.forbidden('Rol sayfa varsayılanları yalnızca sistem kullanıcısı tarafından ayarlanabilir')
+      throw AppError.forbidden(
+        'Rol sayfa varsayılanları yalnızca sistem kullanıcısı tarafından ayarlanabilir'
+      )
     }
     const validPageKeys = PAGES_REQUIRING_PERMISSION as readonly string[]
     for (const key of data.page_keys) {
@@ -540,7 +556,9 @@ export class AuthService extends BaseService<User> {
     }
     const targetRole = data.target_role
     if (actor.role === 'superadmin' && targetRole !== 'admin' && targetRole !== 'user') {
-      throw AppError.badRequest('Superadmin sadece admin veya user rolü için atanabilir sayfa alabilir')
+      throw AppError.badRequest(
+        'Superadmin sadece admin veya user rolü için atanabilir sayfa alabilir'
+      )
     }
     if (actor.role === 'admin' && targetRole !== 'user') {
       throw AppError.badRequest('Admin sadece user rolü için atanabilir sayfa alabilir')

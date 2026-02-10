@@ -42,3 +42,14 @@ export interface PaginatedResponse<T> {
   limit: number
   totalPages: number
 }
+
+/** Batch sort order güncelleme için item */
+export interface SortOrderItem {
+  id: number
+  sort_order: number
+}
+
+/** Batch sort order güncelleme request */
+export interface UpdateSortOrderRequest {
+  items: SortOrderItem[]
+}
