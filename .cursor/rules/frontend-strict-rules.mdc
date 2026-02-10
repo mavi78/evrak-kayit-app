@@ -22,7 +22,7 @@ src/renderer/src/
   theme/          # Mantine tema yapılandırması
 ```
 
-- Context import'ları **yalnızca** `@renderer/context` barrel'inden yapılır (örn. `import { AuthProvider, useAuth } from '@renderer/context'`). Context tanımı `auth-context-def.ts` içindedir; `AuthContext.ts` adı çözümleyici karışıklığına yol açtığı için kullanılmaz.
+- Context Provider ve tanımları **yalnızca** `@renderer/context` barrel'inden import edilir (örn. `import { AuthProvider, AuthContext } from '@renderer/context'`). Custom hook'lar ise `@renderer/hooks/` klasöründen import edilir (örn. `import { useAuth } from '@renderer/hooks/useAuth'`). Context tanımı `auth-context-def.ts` içindedir; `AuthContext.ts` adı çözümleyici karışıklığına yol açtığı için kullanılmaz.
 
 - Yeni sayfa → `pages/{sayfa-adi}/` klasöründe `{SayfaAdi}Page.tsx` dosyası.
 - Tekrar kullanılabilir bileşen → `components/` altında uygun alt klasör.

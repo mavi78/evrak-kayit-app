@@ -45,20 +45,28 @@ function getUserById(id: string): Promise<User | null> {
 
 Kullanıcı ile **her zaman Türkçe** konuşulacak. Kod içi isimler İngilizce kalacak, ancak tüm açıklamalar, commit mesajları ve kullanıcıya yönelik çıktılar Türkçe olacak.
 
-## 5. İş Akışı — Önce Analiz, Sonra Onay
+## 5. İş Akışı — Önce Netleştir, Sonra Planla, Sonra Kodla
 
 **İlk adım (atlanırsa iş geçersiz):** İlgili skill dosyasını (`.cursor/skills/.../SKILL.md`) **Read** ile aç ve uygula. Bu yapılmadan analiz/kod yazılmaz.
 
-Bir istek geldiğinde şu adımlar izlenecek:
+Bir kodlama isteği geldiğinde şu adımlar izlenecek:
 
-1. **Skill ve Kurallar (Zorunlu)**: İş türüne göre ilgili `.cursor/skills/` (ui-ux-pro-max, backend-architecture, frontend-architecture, shared-contracts) dosyası **Read** ile okunup uygulanır. Kullanıcı söylemeden yapılır; detay `always-use-skills-and-rules.mdc`.
-2. **Proje Analizi**: Mevcut kod tabanı ve ilgili dosyalar incelenir.
-3. **Netleştirme**: Yapılacak iş net değilse kullanıcıya seçenekler sunularak netleştirilir.
-4. **Onay**: Yapılacak değişiklikler kısaca özetlenip kullanıcıdan onay alınır.
-5. **Uygulama**: Onay alındıktan sonra kodlama başlar.
-6. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
+1. **Ön Akış — prompt-enhancer (Zorunlu)**: `.cursor/skills/prompt-enhancer/SKILL.md` okunur ve aşağıdaki akış **otomatik** uygulanır. Kullanıcının tetiklemesine gerek yoktur:
+   - **Netleştirme**: İstek soru-cevap / öneri ile netleştirilir. Belirsizlik kalmayana kadar bu adımda kalınır.
+   - **Proje Analizi**: Mevcut kod tabanı ve ilgili dosyalar incelenir.
+   - **Uygulama Planı**: Netleşen istek + analiz sonuçları birleştirilerek detaylı plan oluşturulur.
+   - **Onay**: Plan sunulup kodlamaya başlamak için kullanıcıdan onay alınır.
+2. **Kodlama Skill'leri (Zorunlu — Bağımlılık Sırasıyla)**: Onay alındıktan sonra etkilenen her katmanın skill'i **bağımlılık sırasıyla** okunup uygulanır:
+   - `shared-contracts` → `backend-architecture` → `frontend-architecture` → `ui-ux-pro-max`
+   - Sadece etkilenen katmanların skill'leri okunur; etkilenmeyen katman atlanır.
+   - Her katman kodlanmadan önce o katmanın skill'i **Read** ile okunur.
+   - Detaylar: `always-use-skills-and-rules.mdc` > Çoklu Katman Zincirleme bölümü.
+3. **Uygulama**: İlgili skill'lerin akışına göre, katman bağımlılık sırasıyla kodlama yapılır.
+4. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
    - **TypeCheck**: `npm run typecheck` komutu çalıştırılarak tip hataları kontrol edilecek. (Proje iki tsconfig kullanır: `tsconfig.node.json` — Main/Preload/Shared, `tsconfig.web.json` — Renderer/Shared. Tek `npx tsc --noEmit` çalışmaz.)
    - **Lint**: `npm run lint` komutu çalıştırılarak lint hataları kontrol edilecek.
    - Hata bulunursa düzeltilmeden işlem tamamlanmış sayılmayacak.
+
+> **Not:** Genel sorular (teorik bilgi, açıklama isteme), git işlemleri ve skill/kural düzenlemelerinde ön akış **atlanır**; doğrudan ilgili akışa geçilir.
 
 Belirsiz veya birden fazla yaklaşım mümkünse, AskQuestion ile seçenekler sunulacak.

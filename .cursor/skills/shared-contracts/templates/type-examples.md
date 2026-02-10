@@ -8,13 +8,24 @@ Bu dosya mevcut projeden alınmış tip tanımları örneklerini içerir. Yeni m
 // src/shared/types/auth.types.ts
 import type { BaseEntity, UserRole } from './common.types'
 
+/** TC Kimlik No: tam 11 rakam */
+export const TC_KIMLIK_NO_LENGTH = 11
+
+/** Şifre kuralları: en az 8 karakter, en az bir büyük ve bir küçük harf */
+export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_UPPERCASE_REGEX = /[A-ZÇĞİÖŞÜ]/
+export const PASSWORD_LOWERCASE_REGEX = /[a-zçğıöşü]/
+
 /** Kullanıcı entity'si */
 export interface User extends BaseEntity {
-  username: string
+  tc_kimlik_no: string
   password: string
   full_name: string
+  rutbe: string
   role: UserRole
   is_active: boolean
+  /** Başkası şifreyi değiştirdiyse true; kullanıcı ilk girişte şifre değiştirmek zorunda */
+  must_change_password: boolean
 }
 
 /** Şifre hariç kullanıcı bilgisi - frontend'e gönderilir */
@@ -27,6 +38,12 @@ export interface PagePermission extends Omit<BaseEntity, 'updated_at'> {
   can_access: boolean
   granted_by: number
 }
+
+/** Rol bazlı varsayılan görünürlük — kullanıcıya özel izin yoksa bu kullanılır */
+export interface RoleVisibilityDefault {
+  page_key: string
+  can_access: boolean
+}
 ```
 
 ## Request Tipleri — Kalıp
@@ -34,9 +51,9 @@ export interface PagePermission extends Omit<BaseEntity, 'updated_at'> {
 Her modül için aşağıdaki request tipleri tanımlanır:
 
 ```typescript
-// Login özel request
+// Login özel request — TC Kimlik No + şifre
 export interface LoginRequest {
-  username: string
+  tc_kimlik_no: string
   password: string
 }
 
@@ -44,13 +61,16 @@ export interface LoginRequest {
 export interface LoginResponse {
   user: UserWithoutPassword
   permissions: PagePermission[]
+  /** Giriş yapan kullanıcının rolüne göre varsayılan sayfa görünürlüğü */
+  role_visibility_defaults: RoleVisibilityDefault[]
 }
 
 // Create request — entity'nin oluşturulabilir alanları
 export interface CreateUserRequest {
-  username: string
+  tc_kimlik_no: string
   password: string
   full_name: string
+  rutbe: string
   role: UserRole
 }
 
@@ -58,15 +78,17 @@ export interface CreateUserRequest {
 export interface UpdateUserRequest {
   id: number
   full_name?: string
+  rutbe?: string
   role?: UserRole
   is_active?: boolean
 }
 
-// Özel işlem request'leri
+// Şifre değiştirme — kendi (old_password zorunlu) veya başkasının (old_password yok)
 export interface ChangePasswordRequest {
   user_id: number
-  old_password: string
   new_password: string
+  changed_by: number
+  old_password?: string  // user_id === changed_by ise zorunlu
 }
 
 export interface SetPermissionRequest {
@@ -83,6 +105,27 @@ export interface DeleteUserRequest {
 
 export interface GetPermissionsRequest {
   user_id: number
+}
+
+// Rol bazlı sayfa yönetimi request'leri
+export interface GetRolePageDefaultsRequest {
+  role: Exclude<UserRole, 'system'>
+}
+
+export interface SetRolePageDefaultsRequest {
+  role: Exclude<UserRole, 'system'>
+  page_keys: string[]
+  set_by: number
+}
+
+export interface GetAssignablePagesRequest {
+  target_user_id: number
+  actor_id: number
+}
+
+export interface GetAssignablePagesForRoleRequest {
+  actor_id: number
+  target_role: Exclude<UserRole, 'system'>
 }
 ```
 
@@ -165,6 +208,7 @@ export interface YourEntityDetail extends YourEntity {
 // Tüm tip tanımları bu dosyadan dışa aktarılır
 export * from './common.types'
 export * from './auth.types'
+export * from './app.types'
 // Yeni modüller buraya eklenir:
 // export * from './{modul}.types'
 ```
@@ -180,6 +224,7 @@ export const PAGE_KEYS = {
   OUTGOING_DOCUMENTS: 'outgoing-documents',
   TRANSIT_DOCUMENTS: 'transit-documents',
   USER_MANAGEMENT: 'user-management',
+  PAGE_MANAGEMENT: 'page-management',
   SETTINGS: 'settings',
   LOGS: 'logs',
   COURIER_DELIVERED: 'courier-delivered',
@@ -187,11 +232,26 @@ export const PAGE_KEYS = {
   // YOUR_MODULE: 'your-module',  // ← Yeni modül eklerken buraya satır ekle
 } as const
 
-// Gerekirse erişim kurallarına ekle:
-export const PUBLIC_PAGES: readonly PageKey[] = [
+/** Projede gerçekten tanımlı olan (menüde/route'ta var olan) sayfa anahtarları */
+export const MENU_PAGE_KEYS: readonly PageKey[] = [
   PAGE_KEYS.DASHBOARD,
+  PAGE_KEYS.USER_MANAGEMENT,
+  PAGE_KEYS.PAGE_MANAGEMENT,
   PAGE_KEYS.COURIER_DELIVERED,
   PAGE_KEYS.COURIER_NOT_DELIVERED
+  // Yeni menü öğesi eklerken buraya da ekle
+] as const
+
+/** İzin kontrolü gerektirmeyen sayfalar (her zaman erişilebilir) */
+export const PUBLIC_PAGES: readonly PageKey[] = [PAGE_KEYS.DASHBOARD] as const
+
+/** İzin listesinde yer alan sayfalar */
+export const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
+  PAGE_KEYS.USER_MANAGEMENT,
+  PAGE_KEYS.PAGE_MANAGEMENT,
+  PAGE_KEYS.COURIER_DELIVERED,
+  PAGE_KEYS.COURIER_NOT_DELIVERED
+  // Yeni izinli sayfa eklerken buraya da ekle
 ] as const
 
 export const SUPERADMIN_ONLY_PAGES: readonly PageKey[] = [
@@ -199,4 +259,11 @@ export const SUPERADMIN_ONLY_PAGES: readonly PageKey[] = [
   PAGE_KEYS.SETTINGS,
   PAGE_KEYS.LOGS
 ] as const
+
+/** Varsayılan sayfalama */
+export const DEFAULT_PAGINATION = {
+  PAGE: 1,
+  LIMIT: 20,
+  MAX_LIMIT: 100
+} as const
 ```
