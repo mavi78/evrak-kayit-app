@@ -6,16 +6,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Paper,
-  Title,
-  Text,
-  PasswordInput,
-  Button,
-  Stack,
-  Alert,
-  Box
-} from '@mantine/core'
+import { Paper, Title, Text, PasswordInput, Button, Stack, Alert, Box } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconKey, IconAlertCircle } from '@tabler/icons-react'
 import { useAuth } from '@renderer/hooks/useAuth'
@@ -57,7 +48,10 @@ export default function ChangePasswordPage(): React.JSX.Element {
       changed_by: state.user.id,
       old_password: values.old_password
     })
-    handleApiResponse(response, { showSuccess: true, successMessage: 'Şifre başarıyla değiştirildi' })
+    handleApiResponse(response, {
+      showSuccess: true,
+      successMessage: 'Şifre başarıyla değiştirildi'
+    })
     if (response.success) {
       await refreshPermissions()
       navigate('/dashboard', { replace: true })

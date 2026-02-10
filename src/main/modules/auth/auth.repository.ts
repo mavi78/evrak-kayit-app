@@ -119,7 +119,10 @@ export class AuthRepository extends BaseRepository<User> {
 
       this.db.prepare('DROP TABLE users').run()
       this.db.exec(this.getTableSchemas()[0])
-      this.logger.info('users tablosu yeni şemaya geçirildi (tc_kimlik_no, rutbe)', 'AuthRepository')
+      this.logger.info(
+        'users tablosu yeni şemaya geçirildi (tc_kimlik_no, rutbe)',
+        'AuthRepository'
+      )
     })
   }
 
@@ -194,8 +197,9 @@ export class AuthRepository extends BaseRepository<User> {
       if (tables.sql.includes("'system'")) return
 
       this.db.prepare('PRAGMA foreign_keys = OFF').run()
-      this.db.prepare(
-        `CREATE TABLE users_new (
+      this.db
+        .prepare(
+          `CREATE TABLE users_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           tc_kimlik_no TEXT UNIQUE NOT NULL,
           password TEXT NOT NULL,
@@ -206,15 +210,13 @@ export class AuthRepository extends BaseRepository<User> {
           created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
         )`
-      ).run()
+        )
+        .run()
       this.db.prepare('INSERT INTO users_new SELECT * FROM users').run()
       this.db.prepare('DROP TABLE users').run()
       this.db.prepare('ALTER TABLE users_new RENAME TO users').run()
       this.db.prepare('PRAGMA foreign_keys = ON').run()
-      this.logger.info(
-        "users tablosu role CHECK'e 'system' eklendi",
-        'AuthRepository'
-      )
+      this.logger.info("users tablosu role CHECK'e 'system' eklendi", 'AuthRepository')
     })
   }
 
@@ -226,7 +228,9 @@ export class AuthRepository extends BaseRepository<User> {
     this.safeExecute(() => {
       const columns = this.db.prepare('PRAGMA table_info(users)').all() as { name: string }[]
       if (columns.some((c) => c.name === 'must_change_password')) return
-      this.db.prepare('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0').run()
+      this.db
+        .prepare('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')
+        .run()
       this.logger.info('users tablosuna must_change_password kolonu eklendi', 'AuthRepository')
     })
   }
@@ -288,7 +292,9 @@ export class AuthRepository extends BaseRepository<User> {
   // ================================================================
 
   /** Belirtilen rol için sayfa erişim listesini getirir (page_key, can_access). */
-  getRolePageAccess(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+  getRolePageAccess(
+    role: Exclude<UserRole, 'system'>
+  ): { page_key: string; can_access: boolean }[] {
     return this.safeExecute(() => {
       const stmt = this.db.prepare(
         `SELECT page_key, can_access FROM role_page_access WHERE role = ? ORDER BY page_key`
@@ -335,15 +341,22 @@ export class AuthRepository extends BaseRepository<User> {
         )`
       )
 
-      const rpd = this.db.prepare(`SELECT role, page_key, set_by FROM role_page_defaults`).all() as {
+      const rpd = this.db
+        .prepare(`SELECT role, page_key, set_by FROM role_page_defaults`)
+        .all() as {
         role: string
         page_key: string
         set_by: number | null
       }[]
       const rvd = this.db
-        .prepare(`SELECT target_role AS role, page_key, can_access, granted_by FROM role_visibility_defaults`)
+        .prepare(
+          `SELECT target_role AS role, page_key, can_access, granted_by FROM role_visibility_defaults`
+        )
         .all() as { role: string; page_key: string; can_access: number; granted_by: number }[]
-      const byRole = new Map<string, Map<string, { can_access: number; granted_by: number | null }>>()
+      const byRole = new Map<
+        string,
+        Map<string, { can_access: number; granted_by: number | null }>
+      >()
       for (const r of rpd) {
         if (!byRole.has(r.role)) byRole.set(r.role, new Map())
         byRole.get(r.role)!.set(r.page_key, { can_access: 1, granted_by: r.set_by ?? null })
@@ -369,7 +382,9 @@ export class AuthRepository extends BaseRepository<User> {
   // ================================================================
 
   /** System'ın belirli bir role verdiği sayfa erişim listesini getirir. */
-  getRoleSystemDefaults(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+  getRoleSystemDefaults(
+    role: Exclude<UserRole, 'system'>
+  ): { page_key: string; can_access: boolean }[] {
     return this.safeExecute(() => {
       const stmt = this.db.prepare(
         `SELECT page_key, can_access FROM role_system_defaults WHERE role = ? ORDER BY page_key`
@@ -399,7 +414,9 @@ export class AuthRepository extends BaseRepository<User> {
    * Rol için efektif sayfa erişimi: önce role_system_defaults, üzerine role_page_access (override) uygulanır.
    * Listeleme ve hasPageAccess bu sonucu kullanır.
    */
-  getEffectiveRolePageAccess(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+  getEffectiveRolePageAccess(
+    role: Exclude<UserRole, 'system'>
+  ): { page_key: string; can_access: boolean }[] {
     const systemDefaults = this.getRoleSystemDefaults(role)
     const overrides = this.getRolePageAccess(role)
     const byPage = new Map<string, boolean>()
@@ -418,7 +435,9 @@ export class AuthRepository extends BaseRepository<User> {
   private ensureRoleSystemDefaultsTableAndSeed(): void {
     this.safeExecute(() => {
       const tables = this.db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='role_system_defaults'")
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='role_system_defaults'"
+        )
         .all() as { name: string }[]
       if (tables.length === 0) {
         this.db.exec(
@@ -432,12 +451,19 @@ export class AuthRepository extends BaseRepository<User> {
         )
         this.logger.info('role_system_defaults tablosu oluşturuldu', 'AuthRepository')
       }
-      const count = (this.db.prepare(`SELECT COUNT(*) as c FROM role_system_defaults`).get() as { c: number }).c
+      const count = (
+        this.db.prepare(`SELECT COUNT(*) as c FROM role_system_defaults`).get() as { c: number }
+      ).c
       if (count === 0) {
         const insert = this.db.prepare(
           `INSERT INTO role_system_defaults (role, page_key, can_access) VALUES (?, ?, ?)`
         )
-        const pages = ['user-management', 'page-management', 'courier-delivered', 'courier-not-delivered']
+        const pages = [
+          'user-management',
+          'page-management',
+          'courier-delivered',
+          'courier-not-delivered'
+        ]
         for (const p of pages) {
           insert.run('superadmin', p, 1)
         }
@@ -497,7 +523,9 @@ export class AuthRepository extends BaseRepository<User> {
   // ================================================================
 
   /** Belirtilen rol için efektif sayfa görünürlüğünü getirir (system default + role_page_access override). */
-  getRoleVisibilityDefaults(role: Exclude<UserRole, 'system'>): { page_key: string; can_access: boolean }[] {
+  getRoleVisibilityDefaults(
+    role: Exclude<UserRole, 'system'>
+  ): { page_key: string; can_access: boolean }[] {
     return this.getEffectiveRolePageAccess(role)
   }
 

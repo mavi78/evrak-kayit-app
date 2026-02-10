@@ -47,6 +47,11 @@ const PAGE_ICONS: Record<string, React.ReactNode> = {
   'outgoing-documents': <IconFileExport size={20} stroke={1.5} />,
   'transit-documents': <IconArrowsTransferDown size={20} stroke={1.5} />,
   settings: <IconSettings size={20} stroke={1.5} />,
+  'settings-units': <IconSettings size={20} stroke={1.5} />,
+  'settings-classifications': <IconSettings size={20} stroke={1.5} />,
+  'settings-channels': <IconSettings size={20} stroke={1.5} />,
+  'settings-folders': <IconSettings size={20} stroke={1.5} />,
+  'settings-categories': <IconSettings size={20} stroke={1.5} />,
   logs: <IconFileText size={20} stroke={1.5} />,
   'courier-delivered': <IconTruck size={20} stroke={1.5} />,
   'courier-not-delivered': <IconTruck size={20} stroke={1.5} />,
@@ -177,13 +182,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps): R
 
       if (collapsed) {
         return (
-          <Menu
-            key={route.label}
-            position="right-start"
-            offset={4}
-            shadow="md"
-            withinPortal
-          >
+          <Menu key={route.label} position="right-start" offset={4} shadow="md" withinPortal>
             <Menu.Target>
               <Tooltip label={route.label} position="right">
                 <UnstyledButton

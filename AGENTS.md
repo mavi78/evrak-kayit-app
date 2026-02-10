@@ -24,9 +24,17 @@ Aşağıdaki kural dosyaları her zaman geçerlidir. Her konuşma başlangıcın
 
 İş türüne göre aşağıdaki skill dosyaları **işe başlamadan önce** okunup uygulanacaktır:
 
+### Ön Akış Skill'i (Her Kodlama İsteğinde Otomatik)
+
+Her kodlama isteğinde **kodlama skill'lerinden önce** otomatik uygulanan ön akış. Kullanıcının tetiklemesine gerek yoktur. Akış: **İsteği al → Netleştir (soru-cevap) → Proje analizi → Uygulama planı oluştur → Onay al → Kodlama skill'leri ile implementasyona geç → TypeCheck + Lint**
+
+| İş Türü | Skill Dosyası | Ne Zaman Kullanılır |
+|----------|---------------|---------------------|
+| Her kodlama isteği | `.cursor/skills/prompt-enhancer/SKILL.md` | Yeni özellik, refactoring, bug fix, UI değişikliği vb. kodlama isteği geldiğinde **otomatik** uygulanır. Genel sorular, git işlemleri ve skill/kural düzenlemelerinde **atlanır**. |
+
 ### Kodlama Skill'leri
 
-Kod yazan, dosya oluşturan veya düzenleyen skill'ler. Akış: **Skill oku → Kod yaz → TypeCheck + Lint**
+Kod yazan, dosya oluşturan veya düzenleyen skill'ler. **prompt-enhancer ön akışından sonra** uygulanır. Akış: **Skill oku → Kod yaz → TypeCheck + Lint**
 
 | İş Türü | Skill Dosyası | Ne Zaman Kullanılır |
 |----------|---------------|---------------------|
@@ -34,14 +42,6 @@ Kod yazan, dosya oluşturan veya düzenleyen skill'ler. Akış: **Skill oku → 
 | Backend, servis, veritabanı | `.cursor/skills/backend-architecture/SKILL.md` | Main process, repository, servis kodu yazılırken |
 | Frontend, React, sayfa | `.cursor/skills/frontend-architecture/SKILL.md` | Renderer process, sayfa, hook, context yazılırken |
 | IPC, preload, ortak tipler | `.cursor/skills/shared-contracts/SKILL.md` | IPC kanalı, tip tanımı, preload bridge düzenlenirken |
-
-### Hibrit Skill'ler
-
-Meta akışla başlayıp, kullanıcı onayı ile kodlama akışına geçebilen skill'ler. Akış: **Skill oku → Kendi akışını uygula → Belirsizlikleri gider → Onay al → (opsiyonel) Kodlama skill'lerini kullanarak implementasyona geç → TypeCheck + Lint**
-
-| İş Türü | Skill Dosyası | Ne Zaman Kullanılır |
-|----------|---------------|---------------------|
-| Prompt geliştirme, iyileştirme | `.cursor/skills/prompt-enhancer/SKILL.md` | Kullanıcı prompt geliştirmek, iyileştirmek veya optimize etmek istediğinde. Prompt geliştirildikten sonra belirsizlikler giderilip onay alınırsa kodlama skill'leri ile implementasyona geçilir. |
 
 ### Meta Skill'ler
 
@@ -60,6 +60,17 @@ Kod yazmayan, kendi iş akışına sahip skill'ler. Akış: **Skill oku → Kend
 
 ---
 
+## Proje Hakkında Özet
+
+- **Stack:** Electron 40 + React 19 + Mantine 8 + TypeScript 5 + better-sqlite3
+- **Mimari:** Repository → Service → IPC → Frontend (katmanlı)
+- **Roller:** `system (4) > superadmin (3) > admin (2) > user (1)` — system yalnızca seed ile oluşturulur
+- **Kimlik Doğrulama:** TC Kimlik No (11 rakam) + şifre (min 8 karakter, büyük/küçük harf)
+- **TypeCheck:** `npm run typecheck` (iki tsconfig: `tsconfig.node.json` + `tsconfig.web.json`)
+- **Lint:** `npm run lint`
+
+---
+
 ## Temel Prensipler
 
 ### Tüm Skill'ler İçin Geçerli
@@ -74,12 +85,13 @@ Kod yazmayan, kendi iş akışına sahip skill'ler. Akış: **Skill oku → Kend
 5. **Doğrulama zorunlu**: Her kod değişikliğinden sonra `npm run typecheck` ve `npm run lint` çalıştırılacak.
 6. **OOP & Modüler mimari**: Katmanlı, sınıf tabanlı, tek sorumluluk ilkesine uygun kod yazılacak.
 7. **DRY**: Tekrar eden mantık ortak modüllere çıkarılacak.
+8. **Çoklu Katman Zincirleme**: Birden fazla katman etkileniyorsa skill'ler bağımlılık sırasıyla okunur: `shared-contracts → backend-architecture → frontend-architecture → ui-ux-pro-max`. Sadece etkilenen katmanlar dahil edilir.
 
-### Yalnızca Hibrit Skill'ler İçin Geçerli
+### Yalnızca Ön Akış Skill'i (prompt-enhancer) İçin Geçerli
 
-8. **Kendi iş akışı + implementasyon**: Önce meta akış (prompt geliştirme), ardından onay alınırsa kodlama akışı uygulanır.
-9. **Onay zorunlu**: İmplementasyona geçmeden önce belirsizlikler giderilir ve kullanıcıdan açık onay alınır.
-10. **Koşullu doğrulama**: Yalnızca prompt teslim ediliyorsa TypeCheck/Lint atlanır; implementasyona geçiliyorsa TypeCheck/Lint **zorunludur**.
+8. **Her kodlama isteğinde otomatik**: Kullanıcının tetiklemesine gerek yoktur; kodlama isteği algılandığında otomatik başlar.
+9. **Önce netleştir, sonra kodla**: İstek soru-cevap ile netleştirilir, proje analiz edilir, uygulama planı oluşturulur ve onay alındıktan sonra kodlamaya geçilir.
+10. **Onay zorunlu**: İmplementasyona geçmeden önce belirsizlikler giderilir ve kullanıcıdan açık onay alınır.
 
 ### Yalnızca Meta Skill'ler İçin Geçerli
 

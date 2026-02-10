@@ -61,9 +61,7 @@ function getRoleOptionsForCurrentUser(
   if (!currentUser) return []
   if (currentUser.role === 'admin') return ASSIGNABLE_ROLE_OPTIONS.filter((r) => r.value === 'user')
   if (currentUser.role === 'superadmin') {
-    return ASSIGNABLE_ROLE_OPTIONS.filter(
-      (r) => r.value === 'user' || r.value === 'admin'
-    )
+    return ASSIGNABLE_ROLE_OPTIONS.filter((r) => r.value === 'user' || r.value === 'admin')
   }
   if (currentUser.role === 'system') {
     return [...ASSIGNABLE_ROLE_OPTIONS]
@@ -248,7 +246,10 @@ export default function UserManagementPage(): React.JSX.Element {
       new_password: values.new_password,
       changed_by: currentUser.id
     })
-    handleApiResponse(response, { showSuccess: true, successMessage: 'Şifre başarıyla değiştirildi' })
+    handleApiResponse(response, {
+      showSuccess: true,
+      successMessage: 'Şifre başarıyla değiştirildi'
+    })
     if (response.success) {
       closePassword()
       setUserForPassword(null)

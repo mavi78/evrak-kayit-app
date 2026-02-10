@@ -18,9 +18,7 @@ export function AppLayout(): React.JSX.Element {
   const location = useLocation()
   const { state } = useAuth()
   const showSidebar =
-    location.pathname !== '/login' &&
-    location.pathname !== '/' &&
-    !state.user?.must_change_password
+    location.pathname !== '/login' && location.pathname !== '/' && !state.user?.must_change_password
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const navbarWidth = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
 

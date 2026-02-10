@@ -57,7 +57,9 @@ export default function PageManagementPage(): React.JSX.Element {
   const [roleVisibilityAllowedKeys, setRoleVisibilityAllowedKeys] = useState<string[]>([])
   /** Aktörün açıp kapatabildiği sayfalar (enabled checkbox'lar) */
   const [roleVisibilityAssignableKeys, setRoleVisibilityAssignableKeys] = useState<string[]>([])
-  const [roleVisibilityData, setRoleVisibilityData] = useState<{ page_key: string; can_access: boolean }[]>([])
+  const [roleVisibilityData, setRoleVisibilityData] = useState<
+    { page_key: string; can_access: boolean }[]
+  >([])
   const [loadingRoleVisibility, setLoadingRoleVisibility] = useState(false)
   const [savingRoleVisibility, setSavingRoleVisibility] = useState(false)
 
@@ -152,7 +154,8 @@ export default function PageManagementPage(): React.JSX.Element {
   const toggleRoleVisibility = useCallback((pageKey: string, canAccess: boolean): void => {
     setRoleVisibilityData((prev) => {
       const existing = prev.find((p) => p.page_key === pageKey)
-      if (existing) return prev.map((p) => (p.page_key === pageKey ? { ...p, can_access: canAccess } : p))
+      if (existing)
+        return prev.map((p) => (p.page_key === pageKey ? { ...p, can_access: canAccess } : p))
       return [...prev, { page_key: pageKey, can_access: canAccess }]
     })
   }, [])
@@ -231,8 +234,8 @@ export default function PageManagementPage(): React.JSX.Element {
             <Text fw={600}>Rol varsayılan görünürlüğü</Text>
           </Group>
           <Text size="sm" c="dimmed" mb="md">
-            Bir altındaki rollere varsayılan olarak hangi sayfaların açık/kapalı olacağını belirleyin.
-            Üst rolün verdiği sayfa izinleri doğrultusunda.
+            Bir altındaki rollere varsayılan olarak hangi sayfaların açık/kapalı olacağını
+            belirleyin. Üst rolün verdiği sayfa izinleri doğrultusunda.
           </Text>
           {isSuperadmin && (
             <SegmentedControl
@@ -267,9 +270,7 @@ export default function PageManagementPage(): React.JSX.Element {
                       roleVisibilityData.find((p) => p.page_key === pageKey)?.can_access ?? false
                     }
                     disabled={!canAssign}
-                    onChange={(e) =>
-                      toggleRoleVisibility(pageKey, e.currentTarget.checked)
-                    }
+                    onChange={(e) => toggleRoleVisibility(pageKey, e.currentTarget.checked)}
                   />
                 )
                 return canAssign ? (

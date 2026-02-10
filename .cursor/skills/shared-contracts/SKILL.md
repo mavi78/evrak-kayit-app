@@ -13,11 +13,13 @@ Frontend ve Backend arasındaki sözleşme katmanı. Tip güvenliği, IPC kurall
 src/shared/
 ├── types/
 │   ├── common.types.ts     # BaseEntity, ServiceResponse, UserRole, Pagination
-│   ├── auth.types.ts       # User, LoginRequest, PagePermission, vb.
+│   ├── auth.types.ts       # User, LoginRequest, PagePermission, RoleVisibilityDefault, vb.
+│   ├── app.types.ts        # LoadingProgressPayload (splash ekranı ilerleme)
 │   ├── {modul}.types.ts    # Her modül kendi tip dosyasına sahip
 │   └── index.ts            # Barrel export (tüm tipler)
 └── utils/
-    ├── constants.ts        # PAGE_KEYS, STATUS_CODES, PUBLIC_PAGES, vb.
+    ├── constants.ts        # PAGE_KEYS, MENU_PAGE_KEYS, PAGES_REQUIRING_PERMISSION, STATUS_CODES, vb.
+    ├── validation.ts       # Ortak doğrulama: validatePassword, isValidTcKimlikNo
     └── index.ts            # Barrel export (tüm utils)
 ```
 
@@ -77,7 +79,7 @@ export interface SearchYourRequest {
 // src/shared/types/index.ts
 export * from './common.types'
 export * from './auth.types'
-export * from './{modul}.types'  // ← Yeni satır ekle
+export * from './{modul}.types' // ← Yeni satır ekle
 ```
 
 ### Adım 3: Sabitlere Ekle (Gerekirse)
@@ -86,7 +88,7 @@ export * from './{modul}.types'  // ← Yeni satır ekle
 // src/shared/utils/constants.ts — PAGE_KEYS'e yeni sayfa anahtarı ekle
 export const PAGE_KEYS = {
   // ... mevcut anahtarlar ...
-  YOUR_MODULE: 'your-module',
+  YOUR_MODULE: 'your-module'
 } as const
 ```
 
@@ -118,6 +120,7 @@ interface ServiceResponse<T = null> {
 ```
 
 **Kurallar:**
+
 - Her IPC yanıtı bu formatta olmalı, istisnasız
 - Başarılı: `{ success: true, data: T, message: '...', statusCode: 200|201 }`
 - Hata: `{ success: false, data: null, message: '...', statusCode: 4xx|5xx }`
@@ -126,14 +129,18 @@ interface ServiceResponse<T = null> {
 ### UserRole & ROLE_HIERARCHY
 
 ```typescript
-type UserRole = 'superadmin' | 'admin' | 'user'
+type UserRole = 'system' | 'superadmin' | 'admin' | 'user'
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   user: 1,
   admin: 2,
-  superadmin: 3
+  superadmin: 3,
+  system: 4
 }
 ```
+
+- `system` rolü arayüz veya API ile atanamaz; yalnızca seed ile oluşturulur, silinemez ve kaldırılamaz.
+- Kullanıcı kimlik doğrulama `tc_kimlik_no` (11 rakam) + şifre ile yapılır (`username` kullanılmaz).
 
 ### PaginationParams & PaginatedResponse
 
@@ -158,12 +165,12 @@ interface PaginatedResponse<T> {
 
 ### Format: `{modul}:{aksiyon}`
 
-| Kural | Doğru | Yanlış |
-|-------|-------|--------|
-| Kebab-case | `auth:get-all` | `auth:getAll`, `AUTH:GET_ALL` |
-| Modül tekil | `document:create` | `documents:create` |
-| Aksiyon fiil ile | `auth:login` | `auth:loginPage` |
-| Standart CRUD | `{m}:get-all`, `{m}:get-by-id`, `{m}:create`, `{m}:update`, `{m}:delete` | `{m}:list`, `{m}:fetch` |
+| Kural            | Doğru                                                                    | Yanlış                        |
+| ---------------- | ------------------------------------------------------------------------ | ----------------------------- |
+| Kebab-case       | `auth:get-all`                                                           | `auth:getAll`, `AUTH:GET_ALL` |
+| Modül tekil      | `document:create`                                                        | `documents:create`            |
+| Aksiyon fiil ile | `auth:login`                                                             | `auth:loginPage`              |
+| Standart CRUD    | `{m}:get-all`, `{m}:get-by-id`, `{m}:create`, `{m}:update`, `{m}:delete` | `{m}:list`, `{m}:fetch`       |
 
 ### Standart CRUD Kanalları (BaseService otomatik oluşturur)
 
@@ -178,11 +185,17 @@ interface PaginatedResponse<T> {
 ### Özel Kanallar (getCustomHandlers ile eklenir)
 
 ```
-auth:login             → login özel işlemi
-auth:change-password   → şifre değiştirme
-auth:set-permission    → izin ayarlama
-auth:get-permissions   → izinleri getir
-auth:get-current-user  → oturumdaki kullanıcı
+auth:login                          → login özel işlemi (TC Kimlik No + şifre)
+auth:change-password                → şifre değiştirme (kendi veya başkasının)
+auth:set-permission                 → kullanıcıya sayfa izni ayarlama
+auth:get-permissions                → kullanıcının izinlerini getir
+auth:get-current-user               → oturumdaki kullanıcı bilgileri + izinler
+auth:get-role-page-defaults         → rol bazlı varsayılan sayfa setini getir
+auth:set-role-page-defaults         → rol bazlı varsayılan sayfa setini güncelle (sadece system)
+auth:get-assignable-pages           → hedef kullanıcıya atanabilir sayfalar
+auth:get-assignable-pages-for-role  → hedef role atanabilir sayfalar (UI için)
+auth:get-role-visibility-defaults   → rol sayfa erişimini getir (efektif)
+auth:set-role-visibility-defaults   → alt rol için sayfa erişimini güncelle
 ```
 
 ---
@@ -198,6 +211,7 @@ const PAGE_KEYS = {
   OUTGOING_DOCUMENTS: 'outgoing-documents',
   TRANSIT_DOCUMENTS: 'transit-documents',
   USER_MANAGEMENT: 'user-management',
+  PAGE_MANAGEMENT: 'page-management',
   SETTINGS: 'settings',
   LOGS: 'logs',
   COURIER_DELIVERED: 'courier-delivered',
@@ -207,13 +221,37 @@ const PAGE_KEYS = {
 type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
 ```
 
+### Menü ve Erişim Sabitleri
+
+```typescript
+/** Projede gerçekten route/menü olarak tanımlı sayfalar */
+const MENU_PAGE_KEYS: readonly PageKey[] = [
+  PAGE_KEYS.DASHBOARD,
+  PAGE_KEYS.USER_MANAGEMENT,
+  PAGE_KEYS.PAGE_MANAGEMENT,
+  PAGE_KEYS.COURIER_DELIVERED,
+  PAGE_KEYS.COURIER_NOT_DELIVERED
+] as const
+
+/** İzin kontrolü gerektirmeyen sayfalar (her zaman erişilebilir) */
+const PUBLIC_PAGES: readonly PageKey[] = [PAGE_KEYS.DASHBOARD] as const
+
+/** İzin listesinde yer alan sayfalar (rol varsayılanları, atanabilir sayfalar) */
+const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
+  PAGE_KEYS.USER_MANAGEMENT,
+  PAGE_KEYS.PAGE_MANAGEMENT,
+  PAGE_KEYS.COURIER_DELIVERED,
+  PAGE_KEYS.COURIER_NOT_DELIVERED
+] as const
+```
+
 ### Erişim Kuralları
 
-| Sabit | Açıklama | Sayfalar |
-|-------|----------|----------|
-| `PUBLIC_PAGES` | Herkes erişebilir | dashboard, courier-delivered, courier-not-delivered |
-| `SUPERADMIN_ONLY_PAGES` | Sadece superadmin | user-management, settings, logs |
-| Diğer | İzin tablosundan kontrol | incoming/outgoing/transit docs |
+| Sabit                        | Açıklama                                         | Sayfalar                                     |
+| ---------------------------- | ------------------------------------------------ | -------------------------------------------- |
+| `PUBLIC_PAGES`               | Herkes erişebilir (izin kontrolü yok)            | dashboard                                    |
+| `PAGES_REQUIRING_PERMISSION` | İzin tablosu + rol varsayılanıyla kontrol edilir | user-management, page-management, courier-\* |
+| `MENU_PAGE_KEYS`             | Menüde/route'ta aktif olan tüm sayfalar          | dashboard + izinli sayfalar                  |
 
 ### STATUS_CODES
 
@@ -240,8 +278,7 @@ Preload script **dokunulmaz** — generic `invoke()` pattern ile çalışır:
 ```typescript
 // src/preload/index.ts — Değişiklik yapılmaz!
 const api = {
-  invoke: <T>(channel: string, data?: unknown): Promise<T> =>
-    ipcRenderer.invoke(channel, data),
+  invoke: <T>(channel: string, data?: unknown): Promise<T> => ipcRenderer.invoke(channel, data),
   on: (channel, callback) => ipcRenderer.on(channel, (_e, ...args) => callback(...args)),
   off: (channel, callback) => ipcRenderer.removeListener(channel, callback)
 }
@@ -270,7 +307,7 @@ const api = {
 ```typescript
 // Shared type'da gerçek boolean tanımla
 interface YourEntity extends BaseEntity {
-  is_active: boolean  // ← TypeScript boolean
+  is_active: boolean // ← TypeScript boolean
 }
 
 // Repository'de SQLite dönüşümü otomatik yapılır
@@ -306,8 +343,8 @@ Yeni bir modül eklerken **sırasıyla** tamamlayın:
 - [ ] **7.** `src/renderer/src/pages/{modul}/` → Sayfa bileşeni oluştur
 - [ ] **8.** `src/renderer/src/router/routes.ts` → Route tanımı ekle
 - [ ] **9.** `src/renderer/src/components/layout/AppSidebar.tsx` → İkon eşleştirmesi ekle
-- [ ] **10.** `npx tsc --noEmit` → Tip hatası kontrolü
-- [ ] **11.** `npx eslint .` → Lint kontrolü
+- [ ] **10.** `npm run typecheck` → Tip hatası kontrolü (iki tsconfig: node + web)
+- [ ] **11.** `npm run lint` → Lint kontrolü
 
 ---
 
@@ -315,19 +352,19 @@ Yeni bir modül eklerken **sırasıyla** tamamlayın:
 
 ### Path Alias'lar
 
-| Alias | Hedef | Kullanım Yeri |
-|-------|-------|---------------|
-| `@shared/*` | `src/shared/*` | Main, Preload, Renderer |
-| `@main/*` | `src/main/*` | Sadece Main Process |
-| `@renderer/*` | `src/renderer/src/*` | Sadece Renderer |
+| Alias         | Hedef                | Kullanım Yeri           |
+| ------------- | -------------------- | ----------------------- |
+| `@shared/*`   | `src/shared/*`       | Main, Preload, Renderer |
+| `@main/*`     | `src/main/*`         | Sadece Main Process     |
+| `@renderer/*` | `src/renderer/src/*` | Sadece Renderer         |
 
 ### Config Dosyaları
 
-| Dosya | Kapsam |
-|-------|--------|
-| `tsconfig.json` | Root (project references) |
-| `tsconfig.node.json` | Main + Preload + Shared |
-| `tsconfig.web.json` | Renderer + Shared |
+| Dosya                | Kapsam                    |
+| -------------------- | ------------------------- |
+| `tsconfig.json`      | Root (project references) |
+| `tsconfig.node.json` | Main + Preload + Shared   |
+| `tsconfig.web.json`  | Renderer + Shared         |
 
 ---
 

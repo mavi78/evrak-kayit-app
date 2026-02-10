@@ -31,7 +31,7 @@ src/renderer/src/
 └── theme/              # Mantine tema yapılandırması
 ```
 
-- **Context kullanımı:** Tüm context import'ları `@renderer/context` üzerinden yapılır (barrel). `AuthProvider` ve `AuthContext`/`AuthContextValue` aynı barrel'den gelir; çözümleyici karışıklığını önlemek için context tanımı `auth-context-def.ts` dosyasındadır.
+- **Context kullanımı:** Context Provider ve tanımları `@renderer/context` barrel'inden import edilir (`AuthProvider`, `AuthContext`, `AuthContextValue`). Custom hook'lar ise `@renderer/hooks/` klasöründen import edilir (`useAuth`). Çözümleyici karışıklığını önlemek için context tanımı `auth-context-def.ts` dosyasındadır.
 
 ---
 
@@ -207,7 +207,7 @@ export function YourProvider({ children }: { children: ReactNode }): React.JSX.E
 ```typescript
 // src/renderer/src/hooks/useYour.ts
 import { useContext } from 'react'
-import { YourContext, type YourContextValue } from '@renderer/context'  // ← Barrel import
+import { YourContext, type YourContextValue } from '@renderer/context'  // ← Context barrel import
 
 export function useYour(): YourContextValue {
   const context = useContext(YourContext)
@@ -218,7 +218,7 @@ export function useYour(): YourContextValue {
 }
 ```
 
-> **Not:** Tüm context import'ları `@renderer/context` barrel'inden yapılır. Dosya adları arasında çözümleyici karışıklığını önlemek için context tanımı (createContext, reducer, tipler) `{modul}-context-def.ts`, provider bileşeni `{Modul}Context.tsx` dosyasında tutulur.
+> **Not:** Context tanımları (createContext, reducer, tipler) `{modul}-context-def.ts`, provider bileşeni `{Modul}Context.tsx` dosyasında tutulur. Custom hook'lar ise `hooks/` klasöründe ayrı dosyadadır. Bileşenlerde kullanım: `import { useAuth } from '@renderer/hooks/useAuth'`.
 
 ---
 
@@ -323,6 +323,10 @@ const handleSubmit = async (values: FormValues): Promise<void> => {
 3. `requiresPermission` + `hasPageAccess()` → Yetkisiz → `/dashboard`'a yönlendir
 4. Tüm kontroller geçti → Sayfayı göster
 
+### AuthContext State Yapısı
+
+AuthContext `roleVisibilityDefaults` (rol bazlı varsayılan sayfa görünürlüğü) alanını tutar. `hasPageAccess()` fonksiyonu önce kullanıcıya özel izinleri, yoksa rol varsayılanlarını kontrol eder. `refreshPermissions()` ile izinler backend'den güncellenebilir.
+
 ---
 
 ## YASAK Kullanımlar
@@ -336,7 +340,7 @@ const handleSubmit = async (values: FormValues): Promise<void> => {
 | Bileşen türü | Class component | Fonksiyonel bileşen |
 | DOM erişimi | `document.getElementById()` | React ref / Mantine hook |
 | Global state | `useState` (3+ seviye prop) | Context + useReducer |
-| API çağrısı | `useEffect` içinde direkt | Custom hook üzerinden |
+| API çağrısı | Tekrar eden çağrı mantığı | Custom hook veya `useCallback` + `useEffect` kalıbı |
 
 ---
 
