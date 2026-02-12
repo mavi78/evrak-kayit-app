@@ -13,12 +13,12 @@ Her kodlama isteğinde **otomatik olarak** uygulanan ön akış skill'i. Kullan�
 
 ## Tetikleme Koşulları
 
-| Durum | Bu skill uygulanır mı? |
-|-------|------------------------|
-| Kodlama isteği (yeni özellik, refactoring, bug fix, UI değişikliği vb.) | **Evet** — tam akış uygulanır |
-| Genel soru (teorik bilgi, açıklama isteme, "X nedir?" türü) | **Hayır** — skill atlanır, doğrudan yanıt verilir |
-| Git / commit / push isteği | **Hayır** — `github-turkish-commit` skill'i uygulanır |
-| Skill / kural dosyası düzenleme isteği | **Hayır** — doğrudan düzenleme yapılır |
+| Durum                                                                   | Bu skill uygulanır mı?                                |
+| ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| Kodlama isteği (yeni özellik, refactoring, bug fix, UI değişikliği vb.) | **Evet** — tam akış uygulanır                         |
+| Genel soru (teorik bilgi, açıklama isteme, "X nedir?" türü)             | **Hayır** — skill atlanır, doğrudan yanıt verilir     |
+| Git / commit / push isteği                                              | **Hayır** — `github-turkish-commit` skill'i uygulanır |
+| Skill / kural dosyası düzenleme isteği                                  | **Hayır** — doğrudan düzenleme yapılır                |
 
 ---
 
@@ -154,12 +154,12 @@ Onay alındıktan sonra, uygulama planını adım adım hayata geçir:
 
 1. **Etkilenen katmanları belirle** ve her katman için ilgili skill'i oku:
 
-   | Katman | Okunacak Skill |
-   |--------|----------------|
-   | Backend (Main process, servis, DB) | `.cursor/skills/backend-architecture/SKILL.md` |
-   | Frontend (React, sayfa, hook) | `.cursor/skills/frontend-architecture/SKILL.md` |
-   | UI/UX (bileşen, tasarım, stil) | `.cursor/skills/ui-ux-pro-max/SKILL.md` |
-   | IPC / Shared (tip, kanal, preload) | `.cursor/skills/shared-contracts/SKILL.md` |
+   | Katman                             | Okunacak Skill                                 |
+   | ---------------------------------- | ---------------------------------------------- |
+   | Backend (Main process, servis, DB) | `.agent/skills/backend-architecture/SKILL.md`  |
+   | Frontend (React, sayfa, hook)      | `.agent/skills/frontend-architecture/SKILL.md` |
+   | UI/UX (bileşen, tasarım, stil)     | `.agent/skills/ui-ux-pro-max/SKILL.md`         |
+   | IPC / Shared (tip, kanal, preload) | `.agent/skills/shared-contracts/SKILL.md`      |
 
 2. **TodoWrite ile iş planı oluştur:**
    - Uygulama planındaki adımları somut görevlere (todo) böl.

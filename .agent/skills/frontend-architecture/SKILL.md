@@ -49,8 +49,7 @@ import type { ServiceResponse, YourEntity, CreateYourRequest } from '@shared/typ
 
 export const yourModuleApi = {
   // Standart CRUD — kanal adları BaseService pattern ile eşleşir
-  getAll: (): Promise<ServiceResponse<YourEntity[]>> =>
-    invoke<YourEntity[]>('your-module:get-all'),
+  getAll: (): Promise<ServiceResponse<YourEntity[]>> => invoke<YourEntity[]>('your-module:get-all'),
 
   getById: (id: number): Promise<ServiceResponse<YourEntity>> =>
     invoke<YourEntity>('your-module:get-by-id', { id }),
@@ -66,7 +65,7 @@ export const yourModuleApi = {
 
   // Özel endpointler
   search: (query: string): Promise<ServiceResponse<YourEntity[]>> =>
-    invoke<YourEntity[]>('your-module:search', { query }),
+    invoke<YourEntity[]>('your-module:search', { query })
 }
 ```
 
@@ -136,17 +135,22 @@ const PAGE_ICONS: Record<string, React.ReactNode> = {
 
 ## State Yönetimi Kalıpları
 
-| Kapsam | Yöntem | Ne Zaman? |
-|--------|--------|-----------|
-| Global (kullanıcı, tema) | Context + useReducer | Uygulama genelinde paylaşılan veri |
-| Sayfa düzeyi (liste, filtre) | useState | Tek sayfaya özgü veri |
-| Türetilebilir veri | useMemo | Hesaplanabilir, saklanmamalı |
-| Form state | useForm (Mantine) | Form doğrulama ve yönetim |
+| Kapsam                       | Yöntem               | Ne Zaman?                          |
+| ---------------------------- | -------------------- | ---------------------------------- |
+| Global (kullanıcı, tema)     | Context + useReducer | Uygulama genelinde paylaşılan veri |
+| Sayfa düzeyi (liste, filtre) | useState             | Tek sayfaya özgü veri              |
+| Türetilebilir veri           | useMemo              | Hesaplanabilir, saklanmamalı       |
+| Form state                   | useForm (Mantine)    | Form doğrulama ve yönetim          |
 
 ### Global State — Context + useReducer Kalıbı
 
 ```typescript
-// src/renderer/src/context/{Modul}Context.tsx
+// Proje standardı: Context tanımı ve Provider ayrı dosyalarda tutulur:
+//   context/{modul}-context-def.ts  → createContext, reducer, tipler
+//   context/{Modul}Context.tsx     → Provider bileşeni (Fast Refresh uyumu)
+//   hooks/use{Modul}.ts            → Custom hook
+// Aşağıdaki örnek yapıyı tek dosyada göstermektedir; gerçek uygulamada yukarıdaki bölünmeye uyun.
+// src/renderer/src/context/{Modul}Context.tsx (örnek)
 import { createContext, useReducer, useCallback, type ReactNode } from 'react'
 
 // 1. State tipi
@@ -207,7 +211,7 @@ export function YourProvider({ children }: { children: ReactNode }): React.JSX.E
 ```typescript
 // src/renderer/src/hooks/useYour.ts
 import { useContext } from 'react'
-import { YourContext, type YourContextValue } from '@renderer/context'  // ← Context barrel import
+import { YourContext, type YourContextValue } from '@renderer/context' // ← Context barrel import
 
 export function useYour(): YourContextValue {
   const context = useContext(YourContext)
@@ -260,7 +264,7 @@ if (response.success) {
   // başarılı işlem sonrası aksiyon
   form.reset()
   onClose()
-  fetchItems()  // listeyi yenile
+  fetchItems() // listeyi yenile
 }
 ```
 
@@ -280,8 +284,8 @@ const form = useForm<FormValues>({
   initialValues: { title: '', category: '' },
   validate: {
     title: (v) => (v.trim().length === 0 ? 'Başlık zorunludur' : null),
-    category: (v) => (!v ? 'Kategori seçiniz' : null),
-  },
+    category: (v) => (!v ? 'Kategori seçiniz' : null)
+  }
 })
 
 // 3. Submit handler — API çağrısı + bildirim + temizlik
@@ -292,7 +296,7 @@ const handleSubmit = async (values: FormValues): Promise<void> => {
   if (response.success) {
     form.reset()
     onClose()
-    onSuccess()  // üst bileşene bildir (liste yenileme vb.)
+    onSuccess() // üst bileşene bildir (liste yenileme vb.)
   }
   setLoading(false)
 }
@@ -306,15 +310,15 @@ const handleSubmit = async (values: FormValues): Promise<void> => {
 
 ### Route Yapılandırma Alanları
 
-| Alan | Tip | Açıklama |
-|------|-----|----------|
-| `path` | `string` | URL yolu (`/incoming-documents`) |
-| `component` | `LazyExoticComponent` | Lazy loaded sayfa bileşeni |
-| `pageKey` | `PageKey` | İzin kontrolü anahtarı |
-| `showInSidebar` | `boolean` | Menüde göster |
-| `label` | `string` | Menü etiketi |
-| `minimumRole` | `UserRole?` | Minimum rol seviyesi |
-| `requiresPermission` | `boolean` | İzin tablosu kontrolü |
+| Alan                 | Tip                   | Açıklama                         |
+| -------------------- | --------------------- | -------------------------------- |
+| `path`               | `string`              | URL yolu (`/incoming-documents`) |
+| `component`          | `LazyExoticComponent` | Lazy loaded sayfa bileşeni       |
+| `pageKey`            | `PageKey`             | İzin kontrolü anahtarı           |
+| `showInSidebar`      | `boolean`             | Menüde göster                    |
+| `label`              | `string`              | Menü etiketi                     |
+| `minimumRole`        | `UserRole?`           | Minimum rol seviyesi             |
+| `requiresPermission` | `boolean`             | İzin tablosu kontrolü            |
 
 ### ProtectedRoute Kontrol Sırası
 
@@ -331,16 +335,16 @@ AuthContext `roleVisibilityDefaults` (rol bazlı varsayılan sayfa görünürlü
 
 ## YASAK Kullanımlar
 
-| Konu | YASAK | Kullan |
-|------|-------|--------|
-| HTML elementleri | `<button>`, `<input>`, `<table>` | Mantine bileşenleri |
-| UI kütüphanesi | Bootstrap, MUI, Ant Design | Sadece Mantine |
-| IPC çağrısı | `window.api.invoke(...)` direkt | `lib/api.ts` fonksiyonları |
-| Diyaloglar | `alert()`, `window.confirm()` | Mantine Modal / Notifications |
-| Bileşen türü | Class component | Fonksiyonel bileşen |
-| DOM erişimi | `document.getElementById()` | React ref / Mantine hook |
-| Global state | `useState` (3+ seviye prop) | Context + useReducer |
-| API çağrısı | Tekrar eden çağrı mantığı | Custom hook veya `useCallback` + `useEffect` kalıbı |
+| Konu             | YASAK                            | Kullan                                              |
+| ---------------- | -------------------------------- | --------------------------------------------------- |
+| HTML elementleri | `<button>`, `<input>`, `<table>` | Mantine bileşenleri                                 |
+| UI kütüphanesi   | Bootstrap, MUI, Ant Design       | Sadece Mantine                                      |
+| IPC çağrısı      | `window.api.invoke(...)` direkt  | `lib/api.ts` fonksiyonları                          |
+| Diyaloglar       | `alert()`, `window.confirm()`    | Mantine Modal / Notifications                       |
+| Bileşen türü     | Class component                  | Fonksiyonel bileşen                                 |
+| DOM erişimi      | `document.getElementById()`      | React ref / Mantine hook                            |
+| Global state     | `useState` (3+ seviye prop)      | Context + useReducer                                |
+| API çağrısı      | Tekrar eden çağrı mantığı        | Custom hook veya `useCallback` + `useEffect` kalıbı |
 
 ---
 

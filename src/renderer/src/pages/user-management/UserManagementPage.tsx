@@ -31,8 +31,7 @@ import {
 import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconKey } from '@tabler/icons-react'
-import { format } from 'date-fns'
-import { tr } from 'date-fns/locale'
+import { formatIsoToDisplayWithTime } from '@shared/utils'
 import { authApi } from '@renderer/lib/api'
 import { handleApiResponse, showError } from '@renderer/lib/notifications'
 import { useAuth } from '@renderer/hooks/useAuth'
@@ -315,7 +314,7 @@ export default function UserManagementPage(): React.JSX.Element {
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  {format(new Date(user.updated_at), 'dd.MM.yyyy HH:mm', { locale: tr })}
+                  {formatIsoToDisplayWithTime(user.updated_at)}
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">

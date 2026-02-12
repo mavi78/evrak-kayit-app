@@ -1,8 +1,6 @@
 ---
-description: Electron Main Process (Backend) katı geliştirme kuralları - modül yapısı, veritabanı, hata yönetimi, güvenlik
-globs: src/main/**/*.ts
-alwaysApply: false
----
+
+## description: Electron Main Process (Backend) katı geliştirme kuralları - modül yapısı, veritabanı, hata yönetimi, güvenlik
 
 # Backend Katı Kurallar (Electron Main Process)
 
@@ -27,9 +25,15 @@ src/main/modules/{modul-adi}/
 ```typescript
 // ✅ DOĞRU — Her repository BaseRepository'den türer
 export class DocumentRepository extends BaseRepository<Document> {
-  protected getTableName(): string { return 'documents' }
-  protected getTableSchemas(): readonly string[] { return [SCHEMA] }
-  protected getBooleanColumns(): readonly string[] { return ['is_archived'] }
+  protected getTableName(): string {
+    return 'documents'
+  }
+  protected getTableSchemas(): readonly string[] {
+    return [SCHEMA]
+  }
+  protected getBooleanColumns(): readonly string[] {
+    return ['is_archived']
+  }
   // must_change_password gibi boolean alanlar varsa getBooleanColumns'a ekle
 }
 

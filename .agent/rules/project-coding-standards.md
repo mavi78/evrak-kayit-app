@@ -1,7 +1,6 @@
 ---
-description: Proje geneli kod yazma standartları - isimlendirme, mimari, iletişim ve iş akışı kuralları
-alwaysApply: true
----
+
+## description: Proje geneli kod yazma standartları - isimlendirme, mimari, iletişim ve iş akışı kuralları
 
 # Proje Kod Yazma Standartları
 
@@ -9,16 +8,16 @@ alwaysApply: true
 
 Tüm isimler İngilizce, tutarlı ve anlamlı olmalıdır.
 
-| Öğe | Kural | Örnek |
-|-----|-------|-------|
-| Dosya (modül) | camelCase veya kebab-case | `userService.ts`, `auth-helper.ts` |
-| Klasör | kebab-case | `user-management/`, `shared-utils/` |
-| Değişken | camelCase | `userName`, `isActive` |
-| Sabit | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT`, `API_BASE_URL` |
-| Fonksiyon | camelCase, fiil ile başlar | `getUserById()`, `calculateTotal()` |
-| Sınıf | PascalCase | `UserService`, `DocumentParser` |
-| Interface/Type | PascalCase, "I" prefix yok | `UserProfile`, `ApiResponse` |
-| Enum | PascalCase, üyeleri UPPER_SNAKE | `enum Status { ACTIVE, INACTIVE }` |
+| Öğe            | Kural                           | Örnek                               |
+| -------------- | ------------------------------- | ----------------------------------- |
+| Dosya (modül)  | camelCase veya kebab-case       | `userService.ts`, `auth-helper.ts`  |
+| Klasör         | kebab-case                      | `user-management/`, `shared-utils/` |
+| Değişken       | camelCase                       | `userName`, `isActive`              |
+| Sabit          | UPPER_SNAKE_CASE                | `MAX_RETRY_COUNT`, `API_BASE_URL`   |
+| Fonksiyon      | camelCase, fiil ile başlar      | `getUserById()`, `calculateTotal()` |
+| Sınıf          | PascalCase                      | `UserService`, `DocumentParser`     |
+| Interface/Type | PascalCase, "I" prefix yok      | `UserProfile`, `ApiResponse`        |
+| Enum           | PascalCase, üyeleri UPPER_SNAKE | `enum Status { ACTIVE, INACTIVE }`  |
 
 ## 2. JSDoc Açıklamaları Türkçe Yazılacak
 
@@ -47,11 +46,11 @@ Kullanıcı ile **her zaman Türkçe** konuşulacak. Kod içi isimler İngilizce
 
 ## 5. İş Akışı — Önce Netleştir, Sonra Planla, Sonra Kodla
 
-**İlk adım (atlanırsa iş geçersiz):** İlgili skill dosyasını (`.cursor/skills/.../SKILL.md`) **Read** ile aç ve uygula. Bu yapılmadan analiz/kod yazılmaz.
+**İlk adım (atlanırsa iş geçersiz):** İlgili skill dosyasını (`.agent/skills/.../SKILL.md`) **Read** ile aç ve uygula. Bu yapılmadan analiz/kod yazılmaz.
 
 Bir kodlama isteği geldiğinde şu adımlar izlenecek:
 
-1. **Ön Akış — prompt-enhancer (Zorunlu)**: `.cursor/skills/prompt-enhancer/SKILL.md` okunur ve aşağıdaki akış **otomatik** uygulanır. Kullanıcının tetiklemesine gerek yoktur:
+1. **Ön Akış — prompt-enhancer (Zorunlu)**: `.agent/skills/prompt-enhancer/SKILL.md` okunur ve aşağıdaki akış **otomatik** uygulanır. Kullanıcının tetiklemesine gerek yoktur:
    - **Netleştirme**: İstek soru-cevap / öneri ile netleştirilir. Belirsizlik kalmayana kadar bu adımda kalınır.
    - **Proje Analizi**: Mevcut kod tabanı ve ilgili dosyalar incelenir.
    - **Uygulama Planı**: Netleşen istek + analiz sonuçları birleştirilerek detaylı plan oluşturulur.
@@ -60,7 +59,7 @@ Bir kodlama isteği geldiğinde şu adımlar izlenecek:
    - `shared-contracts` → `backend-architecture` → `frontend-architecture` → `ui-ux-pro-max`
    - Sadece etkilenen katmanların skill'leri okunur; etkilenmeyen katman atlanır.
    - Her katman kodlanmadan önce o katmanın skill'i **Read** ile okunur.
-   - Detaylar: `always-use-skills-and-rules.mdc` > Çoklu Katman Zincirleme bölümü.
+   - Detaylar: `always-use-skills-and-rules.md` > Çoklu Katman Zincirleme bölümü.
 3. **Uygulama**: İlgili skill'lerin akışına göre, katman bağımlılık sırasıyla kodlama yapılır.
 4. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
    - **TypeCheck**: `npm run typecheck` komutu çalıştırılarak tip hataları kontrol edilecek. (Proje iki tsconfig kullanır: `tsconfig.node.json` — Main/Preload/Shared, `tsconfig.web.json` — Renderer/Shared. Tek `npx tsc --noEmit` çalışmaz.)

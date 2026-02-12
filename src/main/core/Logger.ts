@@ -8,8 +8,7 @@ import { app } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, mkdirSync, appendFileSync } from 'fs'
 import { is } from '@electron-toolkit/utils'
-import { format } from 'date-fns'
-import { tr } from 'date-fns/locale'
+import { formatForLogFileName, formatForLogLine } from '@shared/utils'
 
 type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'
 
@@ -32,7 +31,7 @@ export class Logger {
 
   /** Log dosyası yolunu belirler */
   private getLogPath(): string {
-    const today = format(new Date(), 'yyyy-MM-dd', { locale: tr })
+    const today = formatForLogFileName()
     const logFileName = `evrak-kayit-${today}.log`
 
     if (is.dev) {
@@ -51,7 +50,7 @@ export class Logger {
 
   /** Log satırını formatlar ve dosyaya yazar */
   private writeLog(level: LogLevel, message: string, context?: string, error?: Error): void {
-    const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm:ss', { locale: tr })
+    const timestamp = formatForLogLine()
     const contextStr = context ? `[${context}]` : ''
     const logLine = `[${timestamp}] [${level}] ${contextStr} ${message}`
     const errorLine = error?.stack ? `\n  Stack: ${error.stack}` : ''

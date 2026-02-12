@@ -126,6 +126,8 @@ interface TreeItemProps {
   onToggleExpand: (id: number) => void
   onEdit: (unit: Unit) => void
   onDelete: (unit: Unit) => void
+  onAddChild: (unit: Unit) => void
+  onSelect: (unit: Unit) => void
   dropTarget: DropTarget
   isDragging: boolean
   onDragStart: (e: React.DragEvent, unitId: number) => void
@@ -141,6 +143,8 @@ function TreeItem({
   onToggleExpand,
   onEdit,
   onDelete,
+  onAddChild,
+  onSelect,
   dropTarget,
   isDragging,
   onDragStart,
@@ -253,7 +257,10 @@ function TreeItem({
       </Box>
 
       {/* Birlik bilgileri */}
-      <Box style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <Box
+        style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+        onClick={() => onSelect(node)}
+      >
         <Text size="xs" fw={500} style={{ fontSize: 12 }}>
           {node.name}
         </Text>
@@ -267,6 +274,16 @@ function TreeItem({
 
       {/* Aksiyon butonları */}
       <Group gap={2}>
+        <ActionIcon
+          variant="subtle"
+          size="xs"
+          color="green"
+          onClick={() => onAddChild(node)}
+          style={{ width: 20, height: 20 }}
+          title="Alt birlik ekle"
+        >
+          <IconPlus size={12} />
+        </ActionIcon>
         <ActionIcon
           variant="subtle"
           size="xs"
@@ -296,6 +313,8 @@ function TreeView({
   onToggleExpand,
   onEdit,
   onDelete,
+  onAddChild,
+  onSelect,
   onDragEnd,
   onDragOver,
   onDragStart,
@@ -308,6 +327,8 @@ function TreeView({
   onToggleExpand: (id: number) => void
   onEdit: (unit: Unit) => void
   onDelete: (unit: Unit) => void
+  onAddChild: (unit: Unit) => void
+  onSelect: (unit: Unit) => void
   onDragEnd: (e: React.DragEvent) => void
   onDragOver: (e: React.DragEvent, unitId: number) => void
   onDragStart: (e: React.DragEvent, unitId: number) => void
@@ -351,6 +372,8 @@ function TreeView({
             onToggleExpand={onToggleExpand}
             onEdit={onEdit}
             onDelete={onDelete}
+            onAddChild={onAddChild}
+            onSelect={onSelect}
             dropTarget={dropTarget.get(node.id) ?? null}
             isDragging={draggingId === node.id}
             onDragStart={handleDragStartLocal}
@@ -401,6 +424,23 @@ function getNodeLevel(id: number, nodes: TreeNode[], level = 0): number {
   return -1
 }
 
+/** Bir birimin root'tan kendisine kadar olan yolunu döndürür */
+function getUnitPath(unitId: number, units: Unit[]): Unit[] {
+  const unitMap = new Map<number, Unit>()
+  units.forEach((u) => unitMap.set(u.id, u))
+
+  const path: Unit[] = []
+  let current: Unit | undefined = unitMap.get(unitId)
+
+  while (current) {
+    path.unshift(current)
+    if (current.parent_id == null) break
+    current = unitMap.get(current.parent_id)
+  }
+
+  return path
+}
+
 export default function UnitsPage(): React.JSX.Element {
   const [items, setItems] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
@@ -411,6 +451,7 @@ export default function UnitsPage(): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedUnitPath, setSelectedUnitPath] = useState<Unit[]>([])
 
   // Drag & drop hook'u
   const dragDrop = useDragDrop<Unit>({
@@ -508,6 +549,16 @@ export default function UnitsPage(): React.JSX.Element {
   const openDeleteModal = (row: Unit): void => {
     setSelected(row)
     openDelete()
+  }
+
+  const openCreateWithParent = (parentUnit: Unit): void => {
+    createForm.setFieldValue('parent_id', parentUnit.id)
+    openCreate()
+  }
+
+  const handleUnitSelect = (unit: Unit): void => {
+    const path = getUnitPath(unit.id, items)
+    setSelectedUnitPath(path)
   }
 
   const handleCreate = async (values: CreateUnitRequest): Promise<void> => {
@@ -851,25 +902,43 @@ export default function UnitsPage(): React.JSX.Element {
       />
 
       <Card withBorder>
-        {filteredTree.length === 0 ? (
-          <Text c="dimmed" ta="center" py="xl" size="sm">
-            {searchQuery.trim() ? 'Arama sonucu bulunamadı' : 'Henüz birlik eklenmemiş'}
-          </Text>
-        ) : (
-          <TreeView
-            nodes={filteredTree}
-            expanded={expanded}
-            onToggleExpand={toggleExpand}
-            onEdit={openEditModal}
-            onDelete={openDeleteModal}
-            onDragEnd={dragDrop.handleDragEnd}
-            onDragOver={handleDragOver}
-            onDragStart={dragDrop.handleDragStart}
-            onDrop={handleDrop}
-            dropTarget={dragDrop.dropTarget}
-            draggingId={dragDrop.draggingId}
-          />
-        )}
+        <Stack gap="md">
+          {/* Breadcrumb - Seçili birimin yolu */}
+          {selectedUnitPath.length > 0 && (
+            <Group gap={2} align="center" style={{ flexWrap: 'wrap' }}>
+              {selectedUnitPath.map((unit, index) => (
+                <Group key={unit.id} gap={2} align="center">
+                  {index > 0 && <IconChevronRight size={12} />}
+                  <Text size="xs" fw={index === selectedUnitPath.length - 1 ? 600 : 400}>
+                    {unit.name}
+                  </Text>
+                </Group>
+              ))}
+            </Group>
+          )}
+
+          {filteredTree.length === 0 ? (
+            <Text c="dimmed" ta="center" py="xl" size="sm">
+              {searchQuery.trim() ? 'Arama sonucu bulunamadı' : 'Henüz birlik eklenmemiş'}
+            </Text>
+          ) : (
+            <TreeView
+              nodes={filteredTree}
+              expanded={expanded}
+              onToggleExpand={toggleExpand}
+              onEdit={openEditModal}
+              onDelete={openDeleteModal}
+              onAddChild={openCreateWithParent}
+              onSelect={handleUnitSelect}
+              onDragEnd={dragDrop.handleDragEnd}
+              onDragOver={handleDragOver}
+              onDragStart={dragDrop.handleDragStart}
+              onDrop={handleDrop}
+              dropTarget={dragDrop.dropTarget}
+              draggingId={dragDrop.draggingId}
+            />
+          )}
+        </Stack>
       </Card>
 
       <Modal opened={createOpened} onClose={closeCreate} title="Yeni birlik" size="sm">
@@ -881,6 +950,7 @@ export default function UnitsPage(): React.JSX.Element {
               label="Üst birlik"
               placeholder="Üst birlik yok"
               clearable
+              searchable
               data={parentOptions}
               value={
                 createForm.values.parent_id != null ? String(createForm.values.parent_id) : null
@@ -912,6 +982,7 @@ export default function UnitsPage(): React.JSX.Element {
               label="Üst birlik"
               placeholder="Üst birlik yok"
               clearable
+              searchable
               data={parentOptions.filter((o) => Number(o.value) !== editForm.values.id)}
               value={editForm.values.parent_id != null ? String(editForm.values.parent_id) : null}
               onChange={(v) => editForm.setFieldValue('parent_id', v ? Number(v) : null)}

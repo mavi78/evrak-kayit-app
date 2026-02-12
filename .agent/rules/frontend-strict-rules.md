@@ -1,8 +1,6 @@
 ---
-description: React Renderer (Frontend) katı geliştirme kuralları - bileşen yapısı, state yönetimi, API katmanı, UI standartları
-globs: src/renderer/**/*.{ts,tsx}
-alwaysApply: false
----
+
+## description: React Renderer (Frontend) katı geliştirme kuralları - bileşen yapısı, state yönetimi, API katmanı, UI standartları
 
 # Frontend Katı Kurallar (React Renderer)
 
@@ -34,7 +32,7 @@ src/renderer/src/
 - **Sadece fonksiyonel bileşen** kullanılır — class component YASAK.
 - Her bileşen açık `React.JSX.Element` dönüş tipi belirtir.
 - Props interface'i bileşen dosyasının üstünde tanımlanır.
-- **YASAK**: Bileşen içinde inline style — Mantine `sx`, `style` prop veya CSS modülleri kullanılır.
+- **YASAK**: Bileşen içinde inline style — Mantine `style` prop veya CSS modülleri kullanılır.
 - **YASAK**: `document.getElementById`, `querySelector` vb. doğrudan DOM manipülasyonu.
 
 ```typescript
@@ -56,11 +54,11 @@ document.getElementById('root')!.innerHTML = '...'
 
 ## 3. State Yönetimi — Katı
 
-| Kapsam | Yöntem | Örnek |
-|--------|--------|-------|
-| Global (kullanıcı, tema) | Context + useReducer | `AuthContext` |
-| Sayfa düzeyi | useState / useReducer | Form state, tablo filtreleri |
-| Server state | API çağrısı + local state | `authApi.getAll()` |
+| Kapsam                   | Yöntem                    | Örnek                        |
+| ------------------------ | ------------------------- | ---------------------------- |
+| Global (kullanıcı, tema) | Context + useReducer      | `AuthContext`                |
+| Sayfa düzeyi             | useState / useReducer     | Form state, tablo filtreleri |
+| Server state             | API çağrısı + local state | `authApi.getAll()`           |
 
 - **YASAK**: Global state için `useState` kullanmak — `useReducer` kullanılır.
 - **YASAK**: Props drilling (3+ seviye) — Context veya composition pattern kullanılır.

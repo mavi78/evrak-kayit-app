@@ -15,8 +15,8 @@
 // ============================================================
 
 import BetterSqlite3 from 'better-sqlite3'
-import { format } from 'date-fns'
 import { Database } from '@main/database/Database'
+import { formatForDatabase } from '@shared/utils'
 import { AppError } from './AppError'
 import { Logger } from './Logger'
 import type { BaseEntity } from '@shared/types'
@@ -40,6 +40,11 @@ export abstract class BaseRepository<T extends BaseEntity> {
   /** Boolean dönüşümü yapılacak kolon adları (SQLite 0/1 <-> TS boolean) */
   protected getBooleanColumns(): readonly string[] {
     return []
+  }
+
+  /** Text formatlamasından hariç tutulacak kolon adları (password, tc_kimlik_no, role vb.) */
+  protected getExcludedTextColumns(): readonly string[] {
+    return ['password', 'tc_kimlik_no', 'id', 'created_at', 'updated_at', 'role', 'document_type']
   }
 
   constructor() {
@@ -95,14 +100,67 @@ export abstract class BaseRepository<T extends BaseEntity> {
     return result as U
   }
 
-  /** Uygulama verisini DB modeline dönüştürür (true/false -> 0/1) */
+  /**
+   * SQLite toUpperCaseTr fonksiyonunu kullanarak string'i büyük harfe çevirir
+   */
+  protected toUpperCaseTr(value: string): string {
+    if (!value || value.trim().length === 0) return value
+    const stmt = this.db.prepare('SELECT toUpperCaseTr(?) as upper')
+    return (stmt.get(value) as { upper: string }).upper
+  }
+
+  /**
+   * SQLite capitalizeTr fonksiyonunu kullanarak string'in sadece baş harfini büyük yapar
+   */
+  protected capitalizeTr(value: string): string {
+    if (!value || value.trim().length === 0) return value
+    const stmt = this.db.prepare('SELECT capitalizeTr(?) as cap')
+    return (stmt.get(value) as { cap: string }).cap
+  }
+
+  /**
+   * String'i normalize eder: baş/son boşlukları temizler, çoklu boşlukları tek boşluğa indirir
+   */
+  private normalizeText(value: string): string {
+    if (!value || typeof value !== 'string') return ''
+    // Baştaki ve sondaki boşlukları temizle
+    let normalized = value.trim()
+    // Birden fazla boşluğu tek boşluğa indir
+    normalized = normalized.replace(/\s+/g, ' ')
+    return normalized
+  }
+
+  /** Uygulama verisini DB modeline dönüştürür (true/false -> 0/1, text -> normalize + büyük harf) */
   protected toDbModel(data: Record<string, unknown>): Record<string, unknown> {
     const result = { ...data }
+    const excludedCols = this.getExcludedTextColumns()
+    
+    // Boolean dönüşümü
     for (const col of this.getBooleanColumns()) {
       if (col in result && typeof result[col] === 'boolean') {
         result[col] = result[col] ? 1 : 0
       }
     }
+    
+    // Text alanlarını normalize et ve büyük harfe çevir (hariç tutulanlar dışında)
+    for (const key in result) {
+      if (
+        typeof result[key] === 'string' &&
+        result[key] !== null &&
+        !excludedCols.includes(key)
+      ) {
+        const value = result[key] as string
+        // Önce normalize et (boşlukları temizle)
+        const normalized = this.normalizeText(value)
+        // Normalize edilmiş değer varsa büyük harfe çevir, yoksa boş string bırak
+        if (normalized.length > 0) {
+          result[key] = this.toUpperCaseTr(normalized)
+        } else {
+          result[key] = ''
+        }
+      }
+    }
+    
     return result
   }
 
@@ -243,7 +301,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
   /** Kaydı günceller. Boolean alanlar otomatik 0/1'e çevrilir. updated_at otomatik eklenir. */
   update(id: number, data: Record<string, unknown>): T | null {
     return this.safeExecute(() => {
-      const now = format(new Date(), 'yyyy-MM-dd HH:mm:ss')
+      const now = formatForDatabase()
       const dbData = this.toDbModel({ ...data, updated_at: now })
       const keys = Object.keys(dbData)
       const values = Object.values(dbData)

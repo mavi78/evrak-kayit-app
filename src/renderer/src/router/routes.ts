@@ -42,6 +42,9 @@ const ClassificationsPage = lazy(
 const ChannelsPage = lazy(() => import('@renderer/pages/settings/channels/ChannelsPage'))
 const FoldersPage = lazy(() => import('@renderer/pages/settings/folders/FoldersPage'))
 const CategoriesPage = lazy(() => import('@renderer/pages/settings/categories/CategoriesPage'))
+const IncomingDocumentsPage = lazy(
+  () => import('@renderer/pages/incoming-documents/IncomingDocumentsPage')
+)
 
 /** Router'da kullanılan yaprak route (path + component zorunlu) */
 export type LeafRouteConfig = RouteConfig & {
@@ -76,6 +79,15 @@ export const routes: RouteConfig[] = [
     showInSidebar: true,
     label: 'Ana Sayfa',
     requiresPermission: false
+  },
+  {
+    path: '/incoming-documents',
+    component: IncomingDocumentsPage,
+    pageKey: 'incoming-documents',
+    showInSidebar: true,
+    label: 'Gelen Evrak',
+    minimumRole: 'user',
+    requiresPermission: true
   },
   {
     path: '/user-management',

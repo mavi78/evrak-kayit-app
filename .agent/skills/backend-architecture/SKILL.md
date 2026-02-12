@@ -39,7 +39,7 @@ export class YourRepository extends BaseRepository<YourEntity> {
   }
 
   protected override getBooleanColumns(): readonly string[] {
-    return ['is_active']  // SQLite 0/1 <-> boolean dönüşümü
+    return ['is_active'] // SQLite 0/1 <-> boolean dönüşümü
   }
 
   protected getTableSchemas(): readonly string[] {
@@ -84,7 +84,7 @@ export class YourService extends BaseService<YourEntity> {
   }
 
   getChannelPrefix(): string {
-    return 'your-module'  // IPC kanalı: your-module:get-all, your-module:create, vb.
+    return 'your-module' // IPC kanalı: your-module:get-all, your-module:create, vb.
   }
 
   // Standart CRUD'u override et (validasyon ekle)
@@ -98,7 +98,7 @@ export class YourService extends BaseService<YourEntity> {
   // Özel IPC kanalları
   protected override getCustomHandlers(): ServiceHandlerMap {
     return {
-      'your-module:search': (data) => this.search(data as { query: string }),
+      'your-module:search': (data) => this.search(data as { query: string })
     }
   }
 
@@ -126,39 +126,39 @@ serviceManager.register(new YourService())
 
 ### BaseRepository<T> — Miras Alınan Özellikler
 
-| Metod | Açıklama | Override? |
-|-------|----------|-----------|
-| `getTableName()` | Tablo adı | **Zorunlu** |
-| `getTableSchemas()` | CREATE TABLE SQL'leri | **Zorunlu** |
-| `getBooleanColumns()` | Boolean kolon listesi | Gerekirse |
-| `findAll()` | Tüm kayıtlar (DESC) | Nadiren |
-| `findById(id)` | ID ile tek kayıt | Nadiren |
-| `findBy(col, val)` | Kolona göre çoklu kayıt | Hayır |
-| `findOneBy(col, val)` | Kolona göre tek kayıt | Hayır |
-| `create(data)` | Yeni kayıt oluştur | Hayır |
-| `update(id, data)` | Kayıt güncelle (+updated_at) | Hayır |
-| `delete(id)` | Kayıt sil | Hayır |
-| `exists(id)` | Var mı kontrolü | Hayır |
-| `count()` | Toplam kayıt sayısı | Hayır |
-| `safeExecute(fn)` | Güvenli DB işlemi | Hayır |
-| `safeTransaction(fn)` | Atomik transaction | Hayır |
+| Metod                 | Açıklama                     | Override?   |
+| --------------------- | ---------------------------- | ----------- |
+| `getTableName()`      | Tablo adı                    | **Zorunlu** |
+| `getTableSchemas()`   | CREATE TABLE SQL'leri        | **Zorunlu** |
+| `getBooleanColumns()` | Boolean kolon listesi        | Gerekirse   |
+| `findAll()`           | Tüm kayıtlar (DESC)          | Nadiren     |
+| `findById(id)`        | ID ile tek kayıt             | Nadiren     |
+| `findBy(col, val)`    | Kolona göre çoklu kayıt      | Hayır       |
+| `findOneBy(col, val)` | Kolona göre tek kayıt        | Hayır       |
+| `create(data)`        | Yeni kayıt oluştur           | Hayır       |
+| `update(id, data)`    | Kayıt güncelle (+updated_at) | Hayır       |
+| `delete(id)`          | Kayıt sil                    | Hayır       |
+| `exists(id)`          | Var mı kontrolü              | Hayır       |
+| `count()`             | Toplam kayıt sayısı          | Hayır       |
+| `safeExecute(fn)`     | Güvenli DB işlemi            | Hayır       |
+| `safeTransaction(fn)` | Atomik transaction           | Hayır       |
 
 ### BaseService<T> — Miras Alınan Özellikler
 
-| Metod | Açıklama | Override? |
-|-------|----------|-----------|
-| `getModuleName()` | Modül adı (log için) | **Zorunlu** |
-| `getChannelPrefix()` | IPC kanal öneki | **Zorunlu** |
-| `handleGetAll()` | `{prefix}:get-all` handler | Gerekirse |
-| `handleGetById(data)` | `{prefix}:get-by-id` handler | Nadiren |
-| `handleCreate(data)` | `{prefix}:create` handler | Sıklıkla (validasyon) |
-| `handleUpdate(data)` | `{prefix}:update` handler | Sıklıkla (validasyon) |
-| `handleDelete(data)` | `{prefix}:delete` handler | Gerekirse |
-| `getCustomHandlers()` | Özel IPC kanalları ekle | Sıklıkla |
-| `ok(data, msg)` | 200 yanıt oluştur | Hayır |
-| `created(data, msg)` | 201 yanıt oluştur | Hayır |
-| `fail(msg, code)` | Hata yanıtı oluştur | Hayır |
-| `requireId(data)` | ID doğrulama | Hayır |
+| Metod                 | Açıklama                     | Override?             |
+| --------------------- | ---------------------------- | --------------------- |
+| `getModuleName()`     | Modül adı (log için)         | **Zorunlu**           |
+| `getChannelPrefix()`  | IPC kanal öneki              | **Zorunlu**           |
+| `handleGetAll()`      | `{prefix}:get-all` handler   | Gerekirse             |
+| `handleGetById(data)` | `{prefix}:get-by-id` handler | Nadiren               |
+| `handleCreate(data)`  | `{prefix}:create` handler    | Sıklıkla (validasyon) |
+| `handleUpdate(data)`  | `{prefix}:update` handler    | Sıklıkla (validasyon) |
+| `handleDelete(data)`  | `{prefix}:delete` handler    | Gerekirse             |
+| `getCustomHandlers()` | Özel IPC kanalları ekle      | Sıklıkla              |
+| `ok(data, msg)`       | 200 yanıt oluştur            | Hayır                 |
+| `created(data, msg)`  | 201 yanıt oluştur            | Hayır                 |
+| `fail(msg, code)`     | Hata yanıtı oluştur          | Hayır                 |
+| `requireId(data)`     | ID doğrulama                 | Hayır                 |
 
 ---
 
@@ -166,13 +166,13 @@ serviceManager.register(new YourService())
 
 ```typescript
 // ✅ Her zaman AppError kullan
-throw AppError.badRequest('Geçersiz veri')        // 400
-throw AppError.unauthorized('Giriş yapılmadı')    // 401
-throw AppError.forbidden('Yetkiniz yok')           // 403
-throw AppError.notFound('Kayıt bulunamadı')        // 404
-throw AppError.conflict('Zaten mevcut')            // 409
-throw AppError.internal('Sunucu hatası')           // 500
-throw AppError.busy('DB meşgul')                   // 503
+throw AppError.badRequest('Geçersiz veri') // 400
+throw AppError.unauthorized('Giriş yapılmadı') // 401
+throw AppError.forbidden('Yetkiniz yok') // 403
+throw AppError.notFound('Kayıt bulunamadı') // 404
+throw AppError.conflict('Zaten mevcut') // 409
+throw AppError.internal('Sunucu hatası') // 500
+throw AppError.busy('DB meşgul') // 503
 
 // ❌ YASAK
 throw new Error('...')
@@ -183,14 +183,14 @@ console.error('...')
 
 BaseRepository `safeExecute` içinde SQLite hatalarını otomatik çevirir:
 
-| SQLite Hatası | AppError | Kod |
-|---------------|----------|-----|
-| UNIQUE constraint | `conflict()` | 409 |
+| SQLite Hatası          | AppError       | Kod |
+| ---------------------- | -------------- | --- |
+| UNIQUE constraint      | `conflict()`   | 409 |
 | FOREIGN KEY constraint | `badRequest()` | 400 |
-| NOT NULL constraint | `badRequest()` | 400 |
-| CHECK constraint | `badRequest()` | 400 |
-| SQLITE_BUSY / locked | `busy()` | 503 |
-| Diğer | `internal()` | 500 |
+| NOT NULL constraint    | `badRequest()` | 400 |
+| CHECK constraint       | `badRequest()` | 400 |
+| SQLITE_BUSY / locked   | `busy()`       | 503 |
+| Diğer                  | `internal()`   | 500 |
 
 ---
 
@@ -198,7 +198,7 @@ BaseRepository `safeExecute` içinde SQLite hatalarını otomatik çevirir:
 
 - [ ] Şifreler `bcryptjs` ile hashlenmiş (SALT_ROUNDS = 10)
 - [ ] Yanıtlarda şifre alanı `stripPassword()` ile çıkarılmış
-- [ ] Rol hiyerarşisi kontrol edilmiş (superadmin > admin > user)
+- [ ] Rol hiyerarşisi kontrol edilmiş (system > superadmin > admin > user)
 - [ ] State-changing işlemlerde audit log yazılmış
 - [ ] SQL sorgularında parameterized query (`?`) kullanılmış
 - [ ] Boolean alanlar `getBooleanColumns()` ile tanımlı
