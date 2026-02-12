@@ -61,6 +61,56 @@ export class UnitRepository extends BaseRepository<Unit> {
     })
   }
 
+  /**
+   * Aynı seviyede (aynı parent_id) birlik adı ile kayıt var mı?
+   * excludeId verilirse güncelleme senaryosunda kendi kaydı hariç tutulur.
+   */
+  findByNameAndParent(
+    name: string,
+    parentId: number | null,
+    excludeId?: number
+  ): Unit | null {
+    return this.safeExecute(() => {
+      const table = this.getTableName()
+      const normalizedName = name.trim()
+      if (!normalizedName) return null
+      const baseSql =
+        parentId == null
+          ? `SELECT * FROM ${table} WHERE name = ? AND parent_id IS NULL`
+          : `SELECT * FROM ${table} WHERE name = ? AND parent_id = ?`
+      const params: (string | number)[] = parentId == null ? [normalizedName] : [normalizedName, parentId]
+      const sql = excludeId ? `${baseSql} AND id != ?` : baseSql
+      if (excludeId != null) params.push(excludeId)
+      const row = this.db.prepare(sql).get(...params) as Record<string, unknown> | undefined
+      return row ? this.toAppModel(row) : null
+    })
+  }
+
+  /**
+   * Aynı seviyede (aynı parent_id) kısa ad ile kayıt var mı?
+   */
+  findByShortNameAndParent(
+    shortName: string,
+    parentId: number | null,
+    excludeId?: number
+  ): Unit | null {
+    return this.safeExecute(() => {
+      const table = this.getTableName()
+      const normalized = shortName.trim()
+      if (!normalized) return null
+      const baseSql =
+        parentId == null
+          ? `SELECT * FROM ${table} WHERE short_name = ? AND parent_id IS NULL`
+          : `SELECT * FROM ${table} WHERE short_name = ? AND parent_id = ?`
+      const params: (string | number)[] =
+        parentId == null ? [normalized] : [normalized, parentId]
+      const sql = excludeId ? `${baseSql} AND id != ?` : baseSql
+      if (excludeId != null) params.push(excludeId)
+      const row = this.db.prepare(sql).get(...params) as Record<string, unknown> | undefined
+      return row ? this.toAppModel(row) : null
+    })
+  }
+
   /** Sıralı liste: önce üst birimler (parent_id NULL), sonra alt birimler, sort_order ve isim sırasına göre */
   findAllOrdered(): Unit[] {
     return this.safeExecute(() => {

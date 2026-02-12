@@ -1,8 +1,6 @@
 ---
-description: TypeScript strict typing - any kullanımını yasaklar ve fonksiyon dönüş tiplerini zorunlu kılar
-globs: **/*.{ts,tsx}
-alwaysApply: false
----
+
+## description: TypeScript strict typing - any kullanımını yasaklar ve fonksiyon dönüş tiplerini zorunlu kılar
 
 # TypeScript Strict Typing Kuralları
 
@@ -13,15 +11,15 @@ alwaysApply: false
 ```typescript
 // YANLIS
 function parse(data: any): any {
-  return data.value;
+  return data.value
 }
 
 // DOGRU
 function parse(data: unknown): string {
   if (typeof data === 'object' && data !== null && 'value' in data) {
-    return String((data as Record<string, unknown>).value);
+    return String((data as Record<string, unknown>).value)
   }
-  throw new Error('Geçersiz veri formatı');
+  throw new Error('Geçersiz veri formatı')
 }
 ```
 
@@ -36,21 +34,21 @@ Tüm fonksiyonlarda dönüş tipi açıkça yazılmalıdır. TypeScript'in tip �
 ```typescript
 // YANLIS
 function topla(a: number, b: number) {
-  return a + b;
+  return a + b
 }
 
 const kullaniciBul = async (id: string) => {
-  return await db.kullanicilar.findOne({ id });
-};
+  return await db.kullanicilar.findOne({ id })
+}
 
 // DOGRU
 function topla(a: number, b: number): number {
-  return a + b;
+  return a + b
 }
 
 const kullaniciBul = async (id: string): Promise<Kullanici | null> => {
-  return await db.kullanicilar.findOne({ id });
-};
+  return await db.kullanicilar.findOne({ id })
+}
 ```
 
 - Arrow function, normal function ve method tanımlarının hepsinde dönüş tipi yaz.

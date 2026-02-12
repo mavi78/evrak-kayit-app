@@ -33,7 +33,16 @@ import type {
   UpdateCategoryRequest,
   UpdateSortOrderRequest,
   UpdateUnitHierarchyRequest,
-  UpdateUnitSortOrderRequest
+  UpdateUnitSortOrderRequest,
+  IncomingDocument,
+  IncomingDocumentDistribution,
+  CreateIncomingDocumentRequest,
+  UpdateIncomingDocumentRequest,
+  SearchIncomingDocumentsRequest,
+  PaginatedIncomingDocumentsResponse,
+  NextRecordInfoResponse,
+  CreateIncomingDocumentDistributionRequest,
+  UpdateIncomingDocumentDistributionRequest
 } from '@shared/types'
 
 /**
@@ -208,4 +217,41 @@ export const categoryApi = {
     invoke<boolean>('category:delete', { id }),
   updateSortOrder: (data: UpdateSortOrderRequest): Promise<ServiceResponse<boolean>> =>
     invoke<boolean>('category:update-sort-order', data)
+}
+
+// ============================================================
+// GELEN EVRAK API
+// ============================================================
+
+export const incomingDocumentApi = {
+  list: (
+    filters: SearchIncomingDocumentsRequest
+  ): Promise<ServiceResponse<PaginatedIncomingDocumentsResponse>> =>
+    invoke<PaginatedIncomingDocumentsResponse>('incoming-document:list', filters),
+  nextRecordInfo: (): Promise<ServiceResponse<NextRecordInfoResponse>> =>
+    invoke<NextRecordInfoResponse>('incoming-document:next-record-info'),
+  getById: (id: number): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('incoming-document:get-by-id', { id }),
+  create: (data: CreateIncomingDocumentRequest): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('incoming-document:create', data),
+  update: (data: UpdateIncomingDocumentRequest): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('incoming-document:update', data),
+  delete: (id: number): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('incoming-document:delete', { id }),
+  getDistributions: (
+    incomingDocumentId: number
+  ): Promise<ServiceResponse<IncomingDocumentDistribution[]>> =>
+    invoke<IncomingDocumentDistribution[]>('incoming-document:get-distributions', {
+      incoming_document_id: incomingDocumentId
+    }),
+  addDistribution: (
+    data: CreateIncomingDocumentDistributionRequest
+  ): Promise<ServiceResponse<IncomingDocumentDistribution>> =>
+    invoke<IncomingDocumentDistribution>('incoming-document:add-distribution', data),
+  updateDistribution: (
+    data: UpdateIncomingDocumentDistributionRequest
+  ): Promise<ServiceResponse<IncomingDocumentDistribution | null>> =>
+    invoke<IncomingDocumentDistribution | null>('incoming-document:update-distribution', data),
+  deleteDistribution: (id: number): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('incoming-document:delete-distribution', { id })
 }

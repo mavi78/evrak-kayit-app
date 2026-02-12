@@ -1,8 +1,6 @@
 ---
-description: IPC iletişim ve shared types katı kuralları - kanal adlandırma, tip güvenliği, preload bridge
-globs: src/preload/**/*.ts, src/shared/**/*.ts
-alwaysApply: false
----
+
+## description: IPC iletişim ve shared types katı kuralları - kanal adlandırma, tip güvenliği, preload bridge
 
 # IPC İletişim ve Shared Types Katı Kuralları
 
@@ -85,15 +83,15 @@ interface ServiceResponse<T = null> {
 
 Modül kanalları dışında, uygulama yaşam döngüsü ve pencere kontrolü için `app:` önekli sistem kanalları kullanılır. Bu kanallar `src/main/index.ts` içinde doğrudan `ipcMain.handle()` ile kaydedilir (ServiceManager dışı):
 
-| Kanal | Yön | Açıklama |
-|-------|-----|----------|
-| `app:window-minimize` | Renderer → Main | Pencere küçültme |
-| `app:window-maximize` | Renderer → Main | Pencere büyütme / geri alma |
-| `app:window-close` | Renderer → Main | Pencere kapatma |
-| `app:window-get-state` | Renderer → Main | Pencere durumu sorgulama (isMaximized) |
+| Kanal                      | Yön             | Açıklama                                         |
+| -------------------------- | --------------- | ------------------------------------------------ |
+| `app:window-minimize`      | Renderer → Main | Pencere küçültme                                 |
+| `app:window-maximize`      | Renderer → Main | Pencere büyütme / geri alma                      |
+| `app:window-close`         | Renderer → Main | Pencere kapatma                                  |
+| `app:window-get-state`     | Renderer → Main | Pencere durumu sorgulama (isMaximized)           |
 | `app:window-state-changed` | Main → Renderer | Pencere durumu değişikliği (maximize/unmaximize) |
-| `app:loading-progress` | Main → Renderer | Splash ekranı yükleme ilerlemesi |
-| `app:backend-ready` | Main → Renderer | Backend başlatma tamamlandı sinyali |
+| `app:loading-progress`     | Main → Renderer | Splash ekranı yükleme ilerlemesi                 |
+| `app:backend-ready`        | Main → Renderer | Backend başlatma tamamlandı sinyali              |
 
 - `app:` kanallarına yeni kanal eklenecekse `src/main/index.ts` ve `src/shared/types/app.types.ts` dosyaları güncellenir.
 - **YASAK**: Modül iş mantığını `app:` kanallarına koymak — modül kanalları ServiceManager üzerinden kayıt edilir.

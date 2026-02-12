@@ -61,6 +61,45 @@ export class Database {
     this.db.pragma('foreign_keys = ON')
     // Performans/güvenlik dengesi
     this.db.pragma('synchronous = NORMAL')
+    this.registerCustomFunctions()
+  }
+
+  /**
+   * SQLite özel fonksiyonları.
+   * toLowerCaseTr: Arama için - küçük harf + Türkçe→ASCII (ş→s, ğ→g vb.)
+   * toUpperCaseTr: Kayıt için - Türkçe kurallarına göre büyük harf (i→İ, ı→I)
+   * capitalizeTr: Baş harf büyütme - Türkçe kurallarına göre sadece ilk harfi büyük yapar
+   */
+  private registerCustomFunctions(): void {
+    this.db.function(
+      'toLowerCaseTr',
+      { deterministic: true },
+      (text: string | null | undefined) => {
+        if (text == null || typeof text !== 'string') return ''
+        return text
+          .toLowerCase()
+          .replace(/ğ/g, 'g')
+          .replace(/ü/g, 'u')
+          .replace(/ş/g, 's')
+          .replace(/ı/g, 'i')
+          .replace(/ö/g, 'o')
+          .replace(/ç/g, 'c')
+      }
+    )
+    this.db.function(
+      'toUpperCaseTr',
+      { deterministic: true },
+      (text: string | null | undefined) => {
+        if (text == null || typeof text !== 'string') return ''
+        return text.toLocaleUpperCase('tr-TR')
+      }
+    )
+    this.db.function('capitalizeTr', { deterministic: true }, (text: string | null | undefined) => {
+      if (text == null || typeof text !== 'string' || text.length === 0) return ''
+      const firstChar = text.charAt(0).toLocaleUpperCase('tr-TR')
+      const rest = text.slice(1).toLocaleLowerCase('tr-TR')
+      return firstChar + rest
+    })
   }
 
   close(): void {

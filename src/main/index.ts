@@ -23,6 +23,7 @@ import { ClassificationService } from './modules/classification/classification.s
 import { ChannelService } from './modules/channel/channel.service'
 import { FolderService } from './modules/folder/folder.service'
 import { CategoryService } from './modules/category/category.service'
+import { IncomingDocumentService } from './modules/incoming-document/incoming-document.service'
 
 import type { LoadingProgressPayload } from '@shared/types'
 
@@ -83,6 +84,7 @@ async function runBackendInit(splashWindow: BrowserWindow): Promise<ServiceManag
   serviceManager.register(new ChannelService())
   serviceManager.register(new FolderService())
   serviceManager.register(new CategoryService())
+  serviceManager.register(new IncomingDocumentService())
   serviceManager.initialize((moduleName) => {
     sendProgress(splashWindow, {
       step: 'service',

@@ -30,6 +30,7 @@ export type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
  */
 export const MENU_PAGE_KEYS: readonly PageKey[] = [
   PAGE_KEYS.DASHBOARD,
+  PAGE_KEYS.INCOMING_DOCUMENTS,
   PAGE_KEYS.USER_MANAGEMENT,
   PAGE_KEYS.PAGE_MANAGEMENT,
   PAGE_KEYS.SETTINGS_UNITS,
@@ -51,6 +52,7 @@ export const PUBLIC_PAGES: readonly PageKey[] = [PAGE_KEYS.DASHBOARD] as const
  * Public sayfalar dahil edilmez; sadece izinle erişilen sayfalar.
  */
 export const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
+  PAGE_KEYS.INCOMING_DOCUMENTS,
   PAGE_KEYS.USER_MANAGEMENT,
   PAGE_KEYS.PAGE_MANAGEMENT,
   PAGE_KEYS.SETTINGS_UNITS,
