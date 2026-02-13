@@ -409,6 +409,16 @@ export function DocumentFormModal({
       size="xl"
       centered
       closeOnClickOutside={false}
+      onKeyDown={(e) => {
+        // Enter tuşu modal'ı kapatmasın — sadece form input/textarea/select içindeyken submit tetiklensin
+        if (e.key === 'Enter') {
+          const tag = (e.target as HTMLElement).tagName?.toLowerCase()
+          if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }
+      }}
       styles={{
         title: { fontWeight: 700, fontSize: '0.95rem' },
         body: {
@@ -428,32 +438,110 @@ export function DocumentFormModal({
           <Loader size="md" type="dots" />
         </Center>
       ) : (
-        <Stack gap="md">
-          {/* ── KAYIT BİLGİLER ── */}
-          <Card
-            withBorder
-            radius="md"
-            padding="md"
-            style={{
-              borderColor: 'var(--mantine-color-gray-3)',
-              backgroundColor: 'var(--mantine-color-white)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
-              maxWidth: '540px'
-            }}
-          >
-            <Text
-              fw={700}
-              size="xs"
-              tt="uppercase"
-              c="gray.7"
-              mb="md"
-              style={{ letterSpacing: '0.5px', fontSize: '0.7rem' }}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handleSave()
+          }}
+        >
+          <Stack gap="md">
+            {/* ── KAYIT BİLGİLER ── */}
+            <Card
+              withBorder
+              radius="md"
+              padding="md"
+              style={{
+                borderColor: 'var(--mantine-color-gray-3)',
+                backgroundColor: 'var(--mantine-color-white)',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+                maxWidth: '540px'
+              }}
             >
-              KAYIT BİLGİLER
-            </Text>
-            <Stack gap="sm">
-              {/* Satır 1: Kayıt No (sol) | KAYIT TARİHİ (sağ) */}
-              <Group gap="sm" align="flex-end" wrap="nowrap" justify="space-between">
+              <Text
+                fw={700}
+                size="xs"
+                tt="uppercase"
+                c="gray.7"
+                mb="md"
+                style={{ letterSpacing: '0.5px', fontSize: '0.7rem' }}
+              >
+                KAYIT BİLGİLER
+              </Text>
+              <Stack gap="sm">
+                {/* Satır 1: Kayıt No (sol) | KAYIT TARİHİ (sağ) */}
+                <Group gap="sm" align="flex-end" wrap="nowrap" justify="space-between">
+                  <Group gap="xs" align="flex-end" wrap="nowrap">
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Kayıt No:
+                    </Text>
+                    <TextInput
+                      size="xs"
+                      value={form.recordNo || '—'}
+                      disabled
+                      styles={{
+                        input: {
+                          backgroundColor: 'var(--mantine-color-gray-1)',
+                          cursor: 'not-allowed',
+                          fontWeight: 500,
+                          fontSize: '0.8rem',
+                          borderColor: 'var(--mantine-color-gray-3)',
+                          color: 'var(--mantine-color-deniz-8)',
+                          paddingLeft: 'var(--mantine-spacing-xs)',
+                          paddingRight: 'var(--mantine-spacing-xs)'
+                        }
+                      }}
+                      style={{ width: '150px', flexShrink: 0 }}
+                    />
+                  </Group>
+                  <Group gap="xs" align="flex-end" wrap="nowrap">
+                    <Text
+                      size="xs"
+                      fw={700}
+                      c="deniz.7"
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      KAYIT TARİHİ:
+                    </Text>
+                    <TextInput
+                      size="xs"
+                      value={getRecordDate()}
+                      disabled
+                      styles={{
+                        input: {
+                          backgroundColor: 'var(--mantine-color-deniz-0)',
+                          borderColor: 'var(--mantine-color-deniz-3)',
+                          cursor: 'not-allowed',
+                          fontWeight: 500,
+                          fontSize: '0.85rem',
+                          textAlign: 'left',
+                          color: 'var(--mantine-color-deniz-8)',
+                          paddingLeft: 'var(--mantine-spacing-xs)',
+                          paddingRight: 'var(--mantine-spacing-xs)'
+                        }
+                      }}
+                      style={{ width: '140px' }}
+                    />
+                  </Group>
+                </Group>
+                {/* Satır 2: Gün Sıra No (tek başına) */}
                 <Group gap="xs" align="flex-end" wrap="nowrap">
                   <Text
                     size="xs"
@@ -467,11 +555,11 @@ export function DocumentFormModal({
                       display: 'block'
                     }}
                   >
-                    Kayıt No:
+                    Gün Sıra No:
                   </Text>
                   <TextInput
                     size="xs"
-                    value={form.recordNo || '—'}
+                    value={form.daySequenceNo || '—'}
                     disabled
                     styles={{
                       input: {
@@ -488,179 +576,8 @@ export function DocumentFormModal({
                     style={{ width: '150px', flexShrink: 0 }}
                   />
                 </Group>
+                {/* Satır 3: Gel.Kanal (sabit genişlik) */}
                 <Group gap="xs" align="flex-end" wrap="nowrap">
-                  <Text
-                    size="xs"
-                    fw={700}
-                    c="deniz.7"
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    KAYIT TARİHİ:
-                  </Text>
-                  <TextInput
-                    size="xs"
-                    value={getRecordDate()}
-                    disabled
-                    styles={{
-                      input: {
-                        backgroundColor: 'var(--mantine-color-deniz-0)',
-                        borderColor: 'var(--mantine-color-deniz-3)',
-                        cursor: 'not-allowed',
-                        fontWeight: 500,
-                        fontSize: '0.85rem',
-                        textAlign: 'left',
-                        color: 'var(--mantine-color-deniz-8)',
-                        paddingLeft: 'var(--mantine-spacing-xs)',
-                        paddingRight: 'var(--mantine-spacing-xs)'
-                      }
-                    }}
-                    style={{ width: '140px' }}
-                  />
-                </Group>
-              </Group>
-              {/* Satır 2: Gün Sıra No (tek başına) */}
-              <Group gap="xs" align="flex-end" wrap="nowrap">
-                <Text
-                  size="xs"
-                  fw={600}
-                  style={{
-                    width: '90px',
-                    textAlign: 'right',
-                    fontSize: '0.7rem',
-                    paddingBottom: '4px',
-                    flexShrink: 0,
-                    display: 'block'
-                  }}
-                >
-                  Gün Sıra No:
-                </Text>
-                <TextInput
-                  size="xs"
-                  value={form.daySequenceNo || '—'}
-                  disabled
-                  styles={{
-                    input: {
-                      backgroundColor: 'var(--mantine-color-gray-1)',
-                      cursor: 'not-allowed',
-                      fontWeight: 500,
-                      fontSize: '0.8rem',
-                      borderColor: 'var(--mantine-color-gray-3)',
-                      color: 'var(--mantine-color-deniz-8)',
-                      paddingLeft: 'var(--mantine-spacing-xs)',
-                      paddingRight: 'var(--mantine-spacing-xs)'
-                    }
-                  }}
-                  style={{ width: '150px', flexShrink: 0 }}
-                />
-              </Group>
-              {/* Satır 3: Gel.Kanal (sabit genişlik) */}
-              <Group gap="xs" align="flex-end" wrap="nowrap">
-                <Text
-                  size="xs"
-                  fw={600}
-                  style={{
-                    width: '90px',
-                    textAlign: 'right',
-                    fontSize: '0.7rem',
-                    paddingBottom: '4px',
-                    flexShrink: 0,
-                    display: 'block'
-                  }}
-                >
-                  Gel.Kanal: *
-                </Text>
-                <Select
-                  size="xs"
-                  placeholder="Seçiniz"
-                  data={channels.map((c) => ({ value: String(c.id), label: c.name }))}
-                  value={form.channelId || null}
-                  onChange={(v) => setField('channelId', v ?? '')}
-                  searchable
-                  required
-                  style={{ width: '150px', flexShrink: 0 }}
-                  styles={{
-                    input: {
-                      transition: 'all 200ms ease',
-                      fontSize: '0.8rem',
-                      '&:focus': {
-                        borderColor: 'var(--mantine-color-deniz-6)',
-                        boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                      }
-                    }
-                  }}
-                />
-              </Group>
-            </Stack>
-          </Card>
-
-          {/* ── EVRAK BİLGİLER ── */}
-          <Card
-            withBorder
-            radius="md"
-            padding="md"
-            style={{
-              borderColor: 'var(--mantine-color-gray-3)',
-              backgroundColor: 'var(--mantine-color-white)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)'
-            }}
-          >
-            <Text
-              fw={700}
-              size="xs"
-              tt="uppercase"
-              c="gray.7"
-              mb="md"
-              style={{ letterSpacing: '0.5px', fontSize: '0.7rem' }}
-            >
-              EVRAK BİLGİLER
-            </Text>
-            <Stack gap="sm">
-              {/* Satır 1: Gel.Makam (tam genişlik) */}
-              <Group gap="xs" align="flex-end" wrap="nowrap">
-                <Text
-                  size="xs"
-                  fw={600}
-                  style={{
-                    width: '90px',
-                    textAlign: 'right',
-                    fontSize: '0.7rem',
-                    paddingBottom: '4px',
-                    flexShrink: 0,
-                    display: 'block'
-                  }}
-                >
-                  Gel.Makam: *
-                </Text>
-                <TextInput
-                  size="xs"
-                  placeholder="Makam adı"
-                  value={form.sourceOffice}
-                  onChange={(e) => setField('sourceOffice', e.currentTarget.value)}
-                  required
-                  style={{ flex: 1 }}
-                  styles={{
-                    input: {
-                      fontSize: '0.8rem',
-                      transition: 'all 200ms ease',
-                      '&:focus': {
-                        borderColor: 'var(--mantine-color-deniz-6)',
-                        boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                      }
-                    }
-                  }}
-                />
-              </Group>
-
-              {/* Satır 2: Sayısı + Tarihi */}
-              <Group gap="sm" align="flex-end" wrap="nowrap">
-                <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
                   <Text
                     size="xs"
                     fw={600}
@@ -673,13 +590,75 @@ export function DocumentFormModal({
                       display: 'block'
                     }}
                   >
-                    Sayısı: *
+                    Gel.Kanal: *
+                  </Text>
+                  <Select
+                    size="xs"
+                    placeholder="Seçiniz"
+                    data={channels.map((c) => ({ value: String(c.id), label: c.name }))}
+                    value={form.channelId || null}
+                    onChange={(v) => setField('channelId', v ?? '')}
+                    searchable
+                    required
+                    style={{ width: '150px', flexShrink: 0 }}
+                    styles={{
+                      input: {
+                        transition: 'all 200ms ease',
+                        fontSize: '0.8rem',
+                        '&:focus': {
+                          borderColor: 'var(--mantine-color-deniz-6)',
+                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                        }
+                      }
+                    }}
+                  />
+                </Group>
+              </Stack>
+            </Card>
+
+            {/* ── EVRAK BİLGİLER ── */}
+            <Card
+              withBorder
+              radius="md"
+              padding="md"
+              style={{
+                borderColor: 'var(--mantine-color-gray-3)',
+                backgroundColor: 'var(--mantine-color-white)',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)'
+              }}
+            >
+              <Text
+                fw={700}
+                size="xs"
+                tt="uppercase"
+                c="gray.7"
+                mb="md"
+                style={{ letterSpacing: '0.5px', fontSize: '0.7rem' }}
+              >
+                EVRAK BİLGİLER
+              </Text>
+              <Stack gap="sm">
+                {/* Satır 1: Gel.Makam (tam genişlik) */}
+                <Group gap="xs" align="flex-end" wrap="nowrap">
+                  <Text
+                    size="xs"
+                    fw={600}
+                    style={{
+                      width: '90px',
+                      textAlign: 'right',
+                      fontSize: '0.7rem',
+                      paddingBottom: '4px',
+                      flexShrink: 0,
+                      display: 'block'
+                    }}
+                  >
+                    Gel.Makam: *
                   </Text>
                   <TextInput
                     size="xs"
-                    placeholder="Evrak sayısı"
-                    value={form.referenceNumber}
-                    onChange={(e) => setField('referenceNumber', e.currentTarget.value)}
+                    placeholder="Makam adı"
+                    value={form.sourceOffice}
+                    onChange={(e) => setField('sourceOffice', e.currentTarget.value)}
                     required
                     style={{ flex: 1 }}
                     styles={{
@@ -694,6 +673,81 @@ export function DocumentFormModal({
                     }}
                   />
                 </Group>
+
+                {/* Satır 2: Sayısı + Tarihi */}
+                <Group gap="sm" align="flex-end" wrap="nowrap">
+                  <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Sayısı: *
+                    </Text>
+                    <TextInput
+                      size="xs"
+                      placeholder="Evrak sayısı"
+                      value={form.referenceNumber}
+                      onChange={(e) => setField('referenceNumber', e.currentTarget.value)}
+                      required
+                      style={{ flex: 1 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                  <Group gap="xs" align="flex-end" wrap="nowrap">
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Tarihi: *
+                    </Text>
+                    <TextInput
+                      size="xs"
+                      placeholder="GG.AA.YYYY"
+                      value={form.documentDateInput}
+                      onChange={(e) => setField('documentDateInput', e.currentTarget.value)}
+                      required
+                      maxLength={20}
+                      style={{ width: '130px', flexShrink: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                </Group>
+
+                {/* Satır 3: Konusu (tam genişlik) */}
                 <Group gap="xs" align="flex-end" wrap="nowrap">
                   <Text
                     size="xs"
@@ -707,16 +761,15 @@ export function DocumentFormModal({
                       display: 'block'
                     }}
                   >
-                    Tarihi: *
+                    Konusu: *
                   </Text>
                   <TextInput
                     size="xs"
-                    placeholder="GG.AA.YYYY"
-                    value={form.documentDateInput}
-                    onChange={(e) => setField('documentDateInput', e.currentTarget.value)}
+                    placeholder="Evrak konusu"
+                    value={form.subject}
+                    onChange={(e) => setField('subject', e.currentTarget.value)}
                     required
-                    maxLength={20}
-                    style={{ width: '130px', flexShrink: 0 }}
+                    style={{ flex: 1 }}
                     styles={{
                       input: {
                         fontSize: '0.8rem',
@@ -729,370 +782,334 @@ export function DocumentFormModal({
                     }}
                   />
                 </Group>
-              </Group>
 
-              {/* Satır 3: Konusu (tam genişlik) */}
-              <Group gap="xs" align="flex-end" wrap="nowrap">
-                <Text
+                {/* Satır 4: Eki + Giz.Derec. + Güv.Kont.Nu */}
+                <Group gap="sm" align="flex-end" wrap="nowrap">
+                  <Group gap="xs" align="flex-end" wrap="nowrap">
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Eki: *
+                    </Text>
+                    <NumberInput
+                      size="xs"
+                      min={0}
+                      value={form.attachmentCount}
+                      onChange={(v) => setField('attachmentCount', typeof v === 'number' ? v : 0)}
+                      required
+                      style={{ width: '70px', flexShrink: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                  <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Giz.Derec.: *
+                    </Text>
+                    <Select
+                      size="xs"
+                      placeholder="Seçiniz"
+                      data={classifications.map((c) => ({
+                        value: String(c.id),
+                        label: c.short_name
+                      }))}
+                      value={form.classificationId || null}
+                      onChange={(v) => {
+                        const newValue = v ?? ''
+                        // 1. Yeni değer yoksa direkt güncelle
+                        if (!newValue) {
+                          setField('classificationId', '')
+                          return
+                        }
+
+                        // 2. Güvenlik No dolu mu?
+                        const hasSecurityNo =
+                          form.securityControlNo && form.securityControlNo.trim().length > 0
+                        if (!hasSecurityNo) {
+                          setField('classificationId', newValue)
+                          return
+                        }
+
+                        // 3. Yeni seçim Güvenlik No gerektiriyor mu?
+                        const newCl = classifications.find((c) => String(c.id) === newValue)
+                        const docType = parseDocumentDateInput(form.documentDateInput).type
+                        const newRequires = isSecurityControlNoRequired(
+                          docType,
+                          newCl?.requires_security_number ?? false
+                        )
+
+                        // 4. Gerektirmiyorsa ve doluysa onay iste
+                        if (!newRequires) {
+                          setPendingClassificationId(newValue)
+                          setConfirmationModalOpen(true)
+                        } else {
+                          setField('classificationId', newValue)
+                        }
+                      }}
+                      searchable
+                      required
+                      style={{ flex: 1, minWidth: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                  <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Güv.Kont.Nu{isSecurityNoRequired ? ': *' : ':'}
+                    </Text>
+                    <TextInput
+                      size="xs"
+                      placeholder="Güvenlik No"
+                      value={form.securityControlNo}
+                      onChange={(e) => setField('securityControlNo', e.currentTarget.value)}
+                      disabled={isSecurityNoDisabled}
+                      required={isSecurityNoRequired}
+                      style={{ flex: 1, minWidth: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          },
+                          '&:disabled': {
+                            backgroundColor: 'var(--mantine-color-gray-1)',
+                            cursor: 'not-allowed',
+                            borderColor: 'var(--mantine-color-gray-3)',
+                            color: 'var(--mantine-color-deniz-8)',
+                            paddingLeft: 'var(--mantine-spacing-xs)',
+                            paddingRight: 'var(--mantine-spacing-xs)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                </Group>
+
+                {/* Satır 5: Sayfa Adeti + Kategorisi + Klasör Adı */}
+                <Group gap="sm" align="flex-end" wrap="nowrap">
+                  <Group gap="xs" align="flex-end" wrap="nowrap">
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Sayfa Adeti: *
+                    </Text>
+                    <NumberInput
+                      size="xs"
+                      min={1}
+                      value={form.pageCount}
+                      onChange={(v) => setField('pageCount', typeof v === 'number' ? v : 1)}
+                      required
+                      style={{ width: '70px', flexShrink: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                  <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Kategorisi: *
+                    </Text>
+                    <Select
+                      size="xs"
+                      placeholder="Seçiniz"
+                      data={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+                      value={form.categoryId || null}
+                      onChange={(v) => setField('categoryId', v ?? '')}
+                      searchable
+                      required
+                      style={{ flex: 1, minWidth: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                  <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
+                    <Text
+                      size="xs"
+                      fw={600}
+                      style={{
+                        width: '90px',
+                        textAlign: 'right',
+                        fontSize: '0.7rem',
+                        paddingBottom: '4px',
+                        flexShrink: 0,
+                        display: 'block'
+                      }}
+                    >
+                      Klasör Adı: *
+                    </Text>
+                    <Select
+                      size="xs"
+                      placeholder="Seçiniz"
+                      data={folders.map((f) => ({ value: String(f.id), label: f.name }))}
+                      value={form.folderId || null}
+                      onChange={(v) => setField('folderId', v ?? '')}
+                      searchable
+                      required
+                      style={{ flex: 1, minWidth: 0 }}
+                      styles={{
+                        input: {
+                          fontSize: '0.8rem',
+                          transition: 'all 200ms ease',
+                          '&:focus': {
+                            borderColor: 'var(--mantine-color-deniz-6)',
+                            boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                          }
+                        }
+                      }}
+                    />
+                  </Group>
+                </Group>
+              </Stack>
+            </Card>
+
+            {/* ── BUTONLAR ── */}
+            <Group justify="space-between" mt="lg" style={{ flexShrink: 0, paddingTop: '0.5rem' }}>
+              {isEditMode && onDelete && (
+                <Button
+                  variant="light"
+                  color="red"
                   size="xs"
-                  fw={600}
-                  style={{
-                    width: '90px',
-                    textAlign: 'right',
-                    fontSize: '0.7rem',
-                    paddingBottom: '4px',
-                    flexShrink: 0,
-                    display: 'block'
+                  leftSection={<IconTrash size={16} />}
+                  onClick={handleDelete}
+                  styles={{
+                    root: {
+                      transition: 'all 200ms ease',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)'
+                      }
+                    }
                   }}
                 >
-                  Konusu: *
-                </Text>
-                <TextInput
+                  Kaldır
+                </Button>
+              )}
+              <Group gap="sm" style={{ marginLeft: 'auto' }}>
+                <Button
+                  variant="default"
                   size="xs"
-                  placeholder="Evrak konusu"
-                  value={form.subject}
-                  onChange={(e) => setField('subject', e.currentTarget.value)}
-                  required
-                  style={{ flex: 1 }}
+                  onClick={onClose}
                   styles={{
-                    input: {
-                      fontSize: '0.8rem',
+                    root: {
                       transition: 'all 200ms ease',
-                      '&:focus': {
-                        borderColor: 'var(--mantine-color-deniz-6)',
-                        boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                      cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: 'var(--mantine-color-gray-1)',
+                        transform: 'translateY(-1px)'
                       }
                     }
                   }}
-                />
-              </Group>
-
-              {/* Satır 4: Eki + Giz.Derec. + Güv.Kont.Nu */}
-              <Group gap="sm" align="flex-end" wrap="nowrap">
-                <Group gap="xs" align="flex-end" wrap="nowrap">
-                  <Text
-                    size="xs"
-                    fw={600}
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    Eki: *
-                  </Text>
-                  <NumberInput
-                    size="xs"
-                    min={0}
-                    value={form.attachmentCount}
-                    onChange={(v) => setField('attachmentCount', typeof v === 'number' ? v : 0)}
-                    required
-                    style={{ width: '70px', flexShrink: 0 }}
-                    styles={{
-                      input: {
-                        fontSize: '0.8rem',
-                        transition: 'all 200ms ease',
-                        '&:focus': {
-                          borderColor: 'var(--mantine-color-deniz-6)',
-                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                        }
+                >
+                  Kapat
+                </Button>
+                <Button
+                  type="submit"
+                  size="xs"
+                  color="deniz"
+                  leftSection={<IconDeviceFloppy size={16} />}
+                  loading={saving}
+                  styles={{
+                    root: {
+                      transition: 'all 200ms ease',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
                       }
-                    }}
-                  />
-                </Group>
-                <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
-                  <Text
-                    size="xs"
-                    fw={600}
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    Giz.Derec.: *
-                  </Text>
-                  <Select
-                    size="xs"
-                    placeholder="Seçiniz"
-                    data={classifications.map((c) => ({
-                      value: String(c.id),
-                      label: c.short_name
-                    }))}
-                    value={form.classificationId || null}
-                    onChange={(v) => {
-                      const newValue = v ?? ''
-                      // 1. Yeni değer yoksa direkt güncelle
-                      if (!newValue) {
-                        setField('classificationId', '')
-                        return
-                      }
-
-                      // 2. Güvenlik No dolu mu?
-                      const hasSecurityNo =
-                        form.securityControlNo && form.securityControlNo.trim().length > 0
-                      if (!hasSecurityNo) {
-                        setField('classificationId', newValue)
-                        return
-                      }
-
-                      // 3. Yeni seçim Güvenlik No gerektiriyor mu?
-                      const newCl = classifications.find((c) => String(c.id) === newValue)
-                      const docType = parseDocumentDateInput(form.documentDateInput).type
-                      const newRequires = isSecurityControlNoRequired(
-                        docType,
-                        newCl?.requires_security_number ?? false
-                      )
-
-                      // 4. Gerektirmiyorsa ve doluysa onay iste
-                      if (!newRequires) {
-                        setPendingClassificationId(newValue)
-                        setConfirmationModalOpen(true)
-                      } else {
-                        setField('classificationId', newValue)
-                      }
-                    }}
-                    searchable
-                    required
-                    style={{ flex: 1, minWidth: 0 }}
-                    styles={{
-                      input: {
-                        fontSize: '0.8rem',
-                        transition: 'all 200ms ease',
-                        '&:focus': {
-                          borderColor: 'var(--mantine-color-deniz-6)',
-                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                        }
-                      }
-                    }}
-                  />
-                </Group>
-                <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
-                  <Text
-                    size="xs"
-                    fw={600}
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    Güv.Kont.Nu{isSecurityNoRequired ? ': *' : ':'}
-                  </Text>
-                  <TextInput
-                    size="xs"
-                    placeholder="Güvenlik No"
-                    value={form.securityControlNo}
-                    onChange={(e) => setField('securityControlNo', e.currentTarget.value)}
-                    disabled={isSecurityNoDisabled}
-                    required={isSecurityNoRequired}
-                    style={{ flex: 1, minWidth: 0 }}
-                    styles={{
-                      input: {
-                        fontSize: '0.8rem',
-                        transition: 'all 200ms ease',
-                        '&:focus': {
-                          borderColor: 'var(--mantine-color-deniz-6)',
-                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                        },
-                        '&:disabled': {
-                          backgroundColor: 'var(--mantine-color-gray-1)',
-                          cursor: 'not-allowed',
-                          borderColor: 'var(--mantine-color-gray-3)',
-                          color: 'var(--mantine-color-deniz-8)',
-                          paddingLeft: 'var(--mantine-spacing-xs)',
-                          paddingRight: 'var(--mantine-spacing-xs)'
-                        }
-                      }
-                    }}
-                  />
-                </Group>
-              </Group>
-
-              {/* Satır 5: Sayfa Adeti + Kategorisi + Klasör Adı */}
-              <Group gap="sm" align="flex-end" wrap="nowrap">
-                <Group gap="xs" align="flex-end" wrap="nowrap">
-                  <Text
-                    size="xs"
-                    fw={600}
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    Sayfa Adeti: *
-                  </Text>
-                  <NumberInput
-                    size="xs"
-                    min={1}
-                    value={form.pageCount}
-                    onChange={(v) => setField('pageCount', typeof v === 'number' ? v : 1)}
-                    required
-                    style={{ width: '70px', flexShrink: 0 }}
-                    styles={{
-                      input: {
-                        fontSize: '0.8rem',
-                        transition: 'all 200ms ease',
-                        '&:focus': {
-                          borderColor: 'var(--mantine-color-deniz-6)',
-                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                        }
-                      }
-                    }}
-                  />
-                </Group>
-                <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
-                  <Text
-                    size="xs"
-                    fw={600}
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    Kategorisi: *
-                  </Text>
-                  <Select
-                    size="xs"
-                    placeholder="Seçiniz"
-                    data={categories.map((c) => ({ value: String(c.id), label: c.name }))}
-                    value={form.categoryId || null}
-                    onChange={(v) => setField('categoryId', v ?? '')}
-                    searchable
-                    required
-                    style={{ flex: 1, minWidth: 0 }}
-                    styles={{
-                      input: {
-                        fontSize: '0.8rem',
-                        transition: 'all 200ms ease',
-                        '&:focus': {
-                          borderColor: 'var(--mantine-color-deniz-6)',
-                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                        }
-                      }
-                    }}
-                  />
-                </Group>
-                <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
-                  <Text
-                    size="xs"
-                    fw={600}
-                    style={{
-                      width: '90px',
-                      textAlign: 'right',
-                      fontSize: '0.7rem',
-                      paddingBottom: '4px',
-                      flexShrink: 0,
-                      display: 'block'
-                    }}
-                  >
-                    Klasör Adı: *
-                  </Text>
-                  <Select
-                    size="xs"
-                    placeholder="Seçiniz"
-                    data={folders.map((f) => ({ value: String(f.id), label: f.name }))}
-                    value={form.folderId || null}
-                    onChange={(v) => setField('folderId', v ?? '')}
-                    searchable
-                    required
-                    style={{ flex: 1, minWidth: 0 }}
-                    styles={{
-                      input: {
-                        fontSize: '0.8rem',
-                        transition: 'all 200ms ease',
-                        '&:focus': {
-                          borderColor: 'var(--mantine-color-deniz-6)',
-                          boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
-                        }
-                      }
-                    }}
-                  />
-                </Group>
-              </Group>
-            </Stack>
-          </Card>
-
-          {/* ── BUTONLAR ── */}
-          <Group justify="space-between" mt="lg" style={{ flexShrink: 0, paddingTop: '0.5rem' }}>
-            {isEditMode && onDelete && (
-              <Button
-                variant="light"
-                color="red"
-                size="xs"
-                leftSection={<IconTrash size={16} />}
-                onClick={handleDelete}
-                styles={{
-                  root: {
-                    transition: 'all 200ms ease',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)'
                     }
-                  }
-                }}
-              >
-                Kaldır
-              </Button>
-            )}
-            <Group gap="sm" style={{ marginLeft: 'auto' }}>
-              <Button
-                variant="default"
-                size="xs"
-                onClick={onClose}
-                styles={{
-                  root: {
-                    transition: 'all 200ms ease',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      backgroundColor: 'var(--mantine-color-gray-1)',
-                      transform: 'translateY(-1px)'
-                    }
-                  }
-                }}
-              >
-                Kapat
-              </Button>
-              <Button
-                size="xs"
-                color="deniz"
-                leftSection={<IconDeviceFloppy size={16} />}
-                onClick={handleSave}
-                loading={saving}
-                styles={{
-                  root: {
-                    transition: 'all 200ms ease',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                    }
-                  }
-                }}
-              >
-                {isEditMode ? 'Güncelle' : 'Kaydet'}
-              </Button>
+                  }}
+                >
+                  {isEditMode ? 'Güncelle' : 'Kaydet'}
+                </Button>
+              </Group>
             </Group>
-          </Group>
-        </Stack>
+          </Stack>
+        </form>
       )}
       <Modal
         opened={confirmationModalOpen}

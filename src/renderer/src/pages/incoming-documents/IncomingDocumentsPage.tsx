@@ -7,9 +7,14 @@
 // ============================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Box, Card, Stack, Title, Text, Group, Select, Pagination } from '@mantine/core'
+import { Box, Card, Stack, Title, Text } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { DocumentTable, DocumentSearchBar, DocumentFormModal } from '@renderer/components/common'
+import {
+  DocumentTable,
+  DocumentSearchBar,
+  DocumentFormModal,
+  DocumentPagination
+} from '@renderer/components/common'
 import { useDocumentSearch } from '@renderer/hooks/useDocumentSearch'
 import { incomingDocumentApi, classificationApi, unitApi } from '@renderer/lib/api'
 import { showError } from '@renderer/lib/notifications'
@@ -25,13 +30,6 @@ import type {
 const PAGE_DESCRIPTION =
   'Gelen evrakları listeleyebilir, arayabilir ve yeni evrak kaydı oluşturabilirsiniz. ' +
   'Satıra tıklayarak evrakın havale/dağıtım bilgilerini görebilirsiniz.'
-
-const PAGE_SIZE_OPTIONS = [
-  { value: '20', label: '20' },
-  { value: '50', label: '50' },
-  { value: '100', label: '100' },
-  { value: '200', label: '200' }
-]
 
 export default function IncomingDocumentsPage(): React.JSX.Element {
   const [list, setList] = useState<IncomingDocument[]>([])
@@ -54,15 +52,17 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   const recordNoSearchRef = useRef(recordNoSearch)
   const searchQueryRef = useRef(searchQuery)
 
-  // Scroll pozisyonunu korumak için ref'ler
+  // Güncelleme sonrası scroll'u korumak için ref'ler
   const scrollViewportRef = useRef<HTMLDivElement | null>(null)
-  const pendingScrollTopRef = useRef<number | null>(null)
+  const pendingScrollToRowIdRef = useRef<number | null>(null)
+  const editingDocRef = useRef(editingDoc)
 
   // Ref'leri güncel tut
   pageRef.current = page
   pageSizeRef.current = pageSize
   recordNoSearchRef.current = recordNoSearch
   searchQueryRef.current = searchQuery
+  editingDocRef.current = editingDoc
 
   const fetchList = useCallback(
     async (params: {
@@ -97,9 +97,10 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   const fetchAll = useCallback(
     (preserveState = false) => {
       if (preserveState) {
-        // Scroll pozisyonunu kaydet
-        if (scrollViewportRef.current) {
-          pendingScrollTopRef.current = scrollViewportRef.current.scrollTop
+        // Güncellenen satırın ID'sini kaydet (scroll için)
+        const editId = editingDocRef.current?.id
+        if (editId != null) {
+          pendingScrollToRowIdRef.current = editId
         }
         const rn = recordNoSearchRef.current.trim()
         void fetchList({
@@ -147,11 +148,18 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
     })
   }, [])
 
-  // Veri güncellendikten sonra scroll pozisyonunu geri yükle
+  // Veri güncellendikten sonra düzenlenen satıra scroll yap
   useEffect(() => {
-    if (pendingScrollTopRef.current !== null && scrollViewportRef.current) {
-      scrollViewportRef.current.scrollTop = pendingScrollTopRef.current
-      pendingScrollTopRef.current = null
+    if (pendingScrollToRowIdRef.current !== null && scrollViewportRef.current) {
+      const rowId = pendingScrollToRowIdRef.current
+      pendingScrollToRowIdRef.current = null
+      // requestAnimationFrame ile DOM güncellemesini bekle
+      requestAnimationFrame(() => {
+        const rowEl = scrollViewportRef.current?.querySelector(`tr[data-row-id="${rowId}"]`)
+        if (rowEl) {
+          rowEl.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+        }
+      })
     }
   }, [list])
 
@@ -177,9 +185,46 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   }, [openModal])
 
   const handleFormSuccess = useCallback(() => {
-    // Eğer düzenleme modundaysak sayfayı koru, yoksa başa dön
-    fetchAll(!!editingDoc)
+    if (editingDoc) {
+      // Düzenleme modunda: sayfayı ve scroll'u koru
+      fetchAll(true)
+    } else {
+      // Yeni kayıt: arama alanlarını temizle, seçimi sıfırla ve başa dön
+      setRecordNoSearch('')
+      setSearchQuery('')
+      setSelectedDoc(null)
+      setDistributions([])
+      fetchAll(false)
+    }
   }, [fetchAll, editingDoc])
+
+  const handlePageChange = useCallback(
+    (p: number) => {
+      setPage(p)
+      const rn = recordNoSearch.trim() ? parseInt(recordNoSearch, 10) : undefined
+      void fetchList({
+        recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
+        query: searchQuery.trim() || undefined,
+        page: p,
+        pageSize
+      })
+    },
+    [fetchList, recordNoSearch, searchQuery, pageSize]
+  )
+
+  const handlePageSizeChange = useCallback(
+    (newSize: number) => {
+      setPageSize(newSize)
+      const rn = recordNoSearch.trim() ? parseInt(recordNoSearch, 10) : undefined
+      void fetchList({
+        recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
+        query: searchQuery.trim() || undefined,
+        page: 1,
+        pageSize: newSize
+      })
+    },
+    [fetchList, recordNoSearch, searchQuery]
+  )
 
   const columns = getIncomingDocumentColumns(classifications)
 
@@ -255,52 +300,13 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
             selectedRowId={selectedDoc?.id}
             viewportRef={scrollViewportRef}
           />
-          {total > 0 && (
-            <Group justify="space-between" mt="xs" wrap="wrap" gap="xs">
-              <Group gap="xs" align="center">
-                <Text size="xs" c="dimmed">
-                  Sayfa başına:
-                </Text>
-                <Select
-                  size="xs"
-                  w={70}
-                  data={PAGE_SIZE_OPTIONS}
-                  value={String(pageSize)}
-                  onChange={(v) => {
-                    const newSize = v ? parseInt(v, 10) : 20
-                    setPageSize(newSize)
-                    const rn = recordNoSearch.trim() ? parseInt(recordNoSearch, 10) : undefined
-                    void fetchList({
-                      recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
-                      query: searchQuery.trim() || undefined,
-                      page: 1,
-                      pageSize: newSize
-                    })
-                  }}
-                />
-                <Text size="xs" c="dimmed">
-                  Toplam: {total}
-                </Text>
-              </Group>
-              <Pagination
-                size="xs"
-                value={page}
-                onChange={(p) => {
-                  setPage(p)
-                  const rn = recordNoSearch.trim() ? parseInt(recordNoSearch, 10) : undefined
-                  void fetchList({
-                    recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
-                    query: searchQuery.trim() || undefined,
-                    page: p,
-                    pageSize
-                  })
-                }}
-                total={Math.ceil(total / pageSize) || 1}
-                siblings={1}
-                boundaries={1}
-              />
-            </Group>
-          )}
+          <DocumentPagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </Box>
       </Card>
 
