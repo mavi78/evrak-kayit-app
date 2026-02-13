@@ -154,6 +154,7 @@ export function DocumentTable<T extends object>({
               return (
                 <Table.Tr
                   key={rowId ?? rowIdx}
+                  data-row-id={rowId}
                   onClick={() => onRowClick?.(row)}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
                   tabIndex={onRowClick || onRowDoubleClick ? 0 : undefined}
