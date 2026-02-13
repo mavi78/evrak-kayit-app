@@ -27,8 +27,8 @@ export function getIncomingDocumentColumns(
         </>
       )
     },
-    { key: 'reference_number', label: 'SAYISI', align: 'left' },
     { key: 'source_office', label: 'MAKAM', align: 'left' },
+    { key: 'reference_number', label: 'SAYISI', align: 'left' },
     {
       key: 'subject',
       label: 'KONUSU',

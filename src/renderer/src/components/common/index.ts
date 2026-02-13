@@ -2,4 +2,3 @@
 export { DocumentTable, type DocumentTableColumn, type DocumentTableProps } from './DocumentTable'
 export { DocumentSearchBar, type DocumentSearchBarProps } from './DocumentSearchBar'
 export { DocumentFormModal, type DocumentFormModalProps } from './DocumentFormModal'
-export { NewDocumentModal, type NewDocumentModalProps } from './NewDocumentModal'
