@@ -1,8 +1,6 @@
----
-
-## description: Proje geneli kod yazma standartları - isimlendirme, mimari, iletişim ve iş akışı kuralları
-
 # Proje Kod Yazma Standartları
+
+> **Description:** Proje geneli kod yazma standartları - isimlendirme, mimari, iletişim ve iş akışı kuralları
 
 ## 1. İsimlendirme Kuralları
 
@@ -65,6 +63,13 @@ Bir kodlama isteği geldiğinde şu adımlar izlenecek:
    - **TypeCheck**: `npm run typecheck` komutu çalıştırılarak tip hataları kontrol edilecek. (Proje iki tsconfig kullanır: `tsconfig.node.json` — Main/Preload/Shared, `tsconfig.web.json` — Renderer/Shared. Tek `npx tsc --noEmit` çalışmaz.)
    - **Lint**: `npm run lint` komutu çalıştırılarak lint hataları kontrol edilecek.
    - Hata bulunursa düzeltilmeden işlem tamamlanmış sayılmayacak.
+
+## 6. Yasaklı API'ler — Katı
+
+- **`alert()` ve `window.confirm()` KESİNLİKLE YASAKTIR.**
+  - Kullanıcıya bilgi vermek için `@mantine/notifications` (`showError`, `showSuccess`) kullanılır.
+  - Onay işlemleri için Mantine `Modal` bileşeni veya `@mantine/modals` kullanılır.
+  - Tarayıcı native diyalogları, uygulamanın native hissini bozar ve renderer process'i bloklar.
 
 > **Not:** Genel sorular (teorik bilgi, açıklama isteme), git işlemleri ve skill/kural düzenlemelerinde ön akış **atlanır**; doğrudan ilgili akışa geçilir.
 
