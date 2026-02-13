@@ -5,22 +5,22 @@
 
 ---
 
-## Zorunlu Kural Dosyaları (`.cursor/rules/`)
+## Zorunlu Kural Dosyaları (`.agent/rules/`)
 
 Aşağıdaki kural dosyaları her zaman geçerlidir. Her konuşma başlangıcında okunup uygulanacaktır:
 
 | Dosya | Açıklama |
 |-------|----------|
-| `.cursor/rules/always-use-skills-and-rules.mdc` | Skill ve kuralların her zaman kullanılmasını zorunlu kılar |
-| `.cursor/rules/project-coding-standards.mdc` | Proje genelinde isimlendirme, mimari, iş akışı standartları |
-| `.cursor/rules/ipc-communication-rules.mdc` | IPC iletişim kuralları ve güvenlik kalıpları |
-| `.cursor/rules/frontend-strict-rules.mdc` | Frontend katmanı için zorunlu kurallar |
-| `.cursor/rules/backend-strict-rules.mdc` | Backend katmanı için zorunlu kurallar |
-| `.cursor/rules/typescript-strict-types.mdc` | TypeScript tip güvenliği kuralları |
+| `.agent/rules/always-use-skills-and-rules.md` | Skill ve kuralların her zaman kullanılmasını zorunlu kılar |
+| `.agent/rules/project-coding-standards.md` | Proje genelinde isimlendirme, mimari, iş akışı standartları |
+| `.agent/rules/ipc-communication-rules.md` | IPC iletişim kuralları ve güvenlik kalıpları |
+| `.agent/rules/frontend-strict-rules.md` | Frontend katmanı için zorunlu kurallar |
+| `.agent/rules/backend-strict-rules.md` | Backend katmanı için zorunlu kurallar |
+| `.agent/rules/typescript-strict-types.md` | TypeScript tip güvenliği kuralları |
 
 ---
 
-## Zorunlu Skill Dosyaları (`.cursor/skills/`)
+## Zorunlu Skill Dosyaları (`.agent/skills/`)
 
 İş türüne göre aşağıdaki skill dosyaları **işe başlamadan önce** okunup uygulanacaktır:
 
@@ -30,7 +30,7 @@ Her kodlama isteğinde **kodlama skill'lerinden önce** otomatik uygulanan ön a
 
 | İş Türü | Skill Dosyası | Ne Zaman Kullanılır |
 |----------|---------------|---------------------|
-| Her kodlama isteği | `.cursor/skills/prompt-enhancer/SKILL.md` | Yeni özellik, refactoring, bug fix, UI değişikliği vb. kodlama isteği geldiğinde **otomatik** uygulanır. Genel sorular, git işlemleri ve skill/kural düzenlemelerinde **atlanır**. |
+| Her kodlama isteği | `.agent/skills/prompt-enhancer/SKILL.md` | Yeni özellik, refactoring, bug fix, UI değişikliği vb. kodlama isteği geldiğinde **otomatik** uygulanır. Genel sorular, git işlemleri ve skill/kural düzenlemelerinde **atlanır**. |
 
 ### Kodlama Skill'leri
 
@@ -38,10 +38,10 @@ Kod yazan, dosya oluşturan veya düzenleyen skill'ler. **prompt-enhancer ön ak
 
 | İş Türü | Skill Dosyası | Ne Zaman Kullanılır |
 |----------|---------------|---------------------|
-| UI/UX, tasarım, görünüm | `.cursor/skills/ui-ux-pro-max/SKILL.md` | Herhangi bir UI bileşeni veya sayfa tasarımı yapılırken |
-| Backend, servis, veritabanı | `.cursor/skills/backend-architecture/SKILL.md` | Main process, repository, servis kodu yazılırken |
-| Frontend, React, sayfa | `.cursor/skills/frontend-architecture/SKILL.md` | Renderer process, sayfa, hook, context yazılırken |
-| IPC, preload, ortak tipler | `.cursor/skills/shared-contracts/SKILL.md` | IPC kanalı, tip tanımı, preload bridge düzenlenirken |
+| UI/UX, tasarım, görünüm | `.agent/skills/ui-ux-pro-max/SKILL.md` | Herhangi bir UI bileşeni veya sayfa tasarımı yapılırken |
+| Backend, servis, veritabanı | `.agent/skills/backend-architecture/SKILL.md` | Main process, repository, servis kodu yazılırken |
+| Frontend, React, sayfa | `.agent/skills/frontend-architecture/SKILL.md` | Renderer process, sayfa, hook, context yazılırken |
+| IPC, preload, ortak tipler | `.agent/skills/shared-contracts/SKILL.md` | IPC kanalı, tip tanımı, preload bridge düzenlenirken |
 
 ### Meta Skill'ler
 
@@ -49,16 +49,33 @@ Kod yazmayan, kendi iş akışına sahip skill'ler. Akış: **Skill oku → Kend
 
 | İş Türü | Skill Dosyası | Ne Zaman Kullanılır |
 |----------|---------------|---------------------|
-| Git, commit, push, GitHub | `.cursor/skills/github-turkish-commit/SKILL.md` | Kod GitHub'a yüklenirken, commit atılırken, push edilirken |
+| Git, commit, push, GitHub | `.agent/skills/github-turkish-commit/SKILL.md` | Kod GitHub'a yüklenirken, commit atılırken, push edilirken |
 
 ### Skill Şablonları
 
-- `.cursor/skills/frontend-architecture/templates/data-display.md`
-- `.cursor/skills/shared-contracts/templates/type-examples.md`
-- `.cursor/skills/backend-architecture/templates/database-patterns.md`
-- `.cursor/skills/backend-architecture/templates/auth-example.md`
+- `.agent/skills/frontend-architecture/templates/data-display.md`
+- `.agent/skills/shared-contracts/templates/type-examples.md`
+- `.agent/skills/backend-architecture/templates/database-patterns.md`
+- `.agent/skills/backend-architecture/templates/auth-example.md`
+
+## Zorunlu İş Akışları (.agent/workflows/)
+
+Aşağıdaki iş akışları `.agent/workflows/` klasöründe tanımlıdır ve ilgili durumlarda kullanılmalıdır:
+
+| Dosya | Açıklama |
+|-------|----------|
+| `backend-service.md` | Backend servis geliştirme iş akışı |
+| `bug-fix.md` | Hata düzeltme iş akışı |
+| `code-review.md` | Kod inceleme (review) iş akışı |
+| `github-push.md` | GitHub push iş akışı |
+| `ipc-channel.md` | IPC kanalı ekleme iş akışı |
+| `new-module.md` | Yeni modül ekleme iş akışı |
+| `new-page.md` | Yeni sayfa ekleme iş akışı |
+| `refactoring.md` | Refactoring iş akışı |
+| `typecheck-lint.md` | TypeCheck ve Lint iş akışı |
 
 ---
+
 
 ## Proje Hakkında Özet
 
