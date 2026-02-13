@@ -66,9 +66,11 @@ export interface CreateIncomingDocumentRequest {
   subject: string
   /** Kullanıcı girişi: DD.MM.YYYY (EVRAK) veya 101842Z FEB 26 (MESAJ) */
   document_date_input: string
+  /** ISO formatında gerçek tarih (backend'de tarih sorguları için) */
+  document_date?: string
   attachment_count?: number
   classification_id: number
-  security_control_no?: string
+  security_control_no?: string | null
   page_count?: number
   category_id: number
   folder_id: number
@@ -82,9 +84,10 @@ export interface UpdateIncomingDocumentRequest {
   reference_number?: string
   subject?: string
   document_date_input?: string
+  document_date?: string
   attachment_count?: number
   classification_id?: number
-  security_control_no?: string
+  security_control_no?: string | null
   page_count?: number
   category_id?: number
   folder_id?: number

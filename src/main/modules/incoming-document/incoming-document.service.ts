@@ -13,11 +13,7 @@ import { AppError } from '@main/core/AppError'
 import { IncomingDocumentRepository } from './incoming-document.repository'
 import { IncomingDocumentDistributionRepository } from './incoming-document-distribution.repository'
 import { ClassificationRepository } from '@main/modules/classification/classification.repository'
-import {
-  parseDocumentDateInput,
-  isSecurityControlNoRequired,
-  toUpperCaseTr
-} from '@shared/utils'
+import { parseDocumentDateInput, isSecurityControlNoRequired, toUpperCaseTr } from '@shared/utils'
 import type {
   IncomingDocument,
   IncomingDocumentDistribution,
@@ -149,7 +145,8 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     if (documentType === 'MESAJ') {
       fields.security_control_no = ''
     } else if (input.security_control_no !== undefined) {
-      fields.security_control_no = toUpperCaseTr(input.security_control_no.trim())
+      fields.security_control_no =
+        input.security_control_no === null ? '' : toUpperCaseTr(input.security_control_no.trim())
     }
     if (input.page_count !== undefined) fields.page_count = input.page_count
     if (input.category_id !== undefined) fields.category_id = input.category_id
@@ -161,8 +158,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
 
   protected override getCustomHandlers(): ServiceHandlerMap {
     return {
-      'incoming-document:list': (data) =>
-        this.handleList(data as SearchIncomingDocumentsRequest),
+      'incoming-document:list': (data) => this.handleList(data as SearchIncomingDocumentsRequest),
       'incoming-document:next-record-info': () => this.handleNextRecordInfo(),
       'incoming-document:get-distributions': (data) => this.handleGetDistributions(data),
       'incoming-document:add-distribution': (data) =>
@@ -245,8 +241,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
       fields.distribution_type = toUpperCaseTr(rest.distribution_type.trim())
     if (rest.delivery_date !== undefined)
       fields.delivery_date = toUpperCaseTr(rest.delivery_date.trim())
-    if (rest.receipt_no !== undefined)
-      fields.receipt_no = toUpperCaseTr(rest.receipt_no.trim())
+    if (rest.receipt_no !== undefined) fields.receipt_no = toUpperCaseTr(rest.receipt_no.trim())
     const item = this.distributionRepository.update(id, fields)
     return this.ok(item, 'Dağıtım güncellendi')
   }

@@ -38,8 +38,13 @@ import type {
 } from '@shared/types'
 import {
   formatDocumentDateForDisplay,
-  isValidDocumentDateInput
+  validateDocumentDate,
+  parseDocumentDateInput,
+  isSecurityControlNoRequired,
+  isSecurityControlNoDisabled,
+  convertDocumentDateToIso
 } from '@shared/utils/documentDateUtils'
+import { formatIsoToDisplayWithTime } from '@shared/utils/dateUtils'
 
 export interface DocumentFormModalProps {
   /** Modal açık mı? */
@@ -114,10 +119,10 @@ export function DocumentFormModal({
   const isEditMode = editingDocument != null
   const modalTitle = title ?? (isEditMode ? 'Evrak Düzenle' : SCOPE_TITLES[scope])
 
-  // Kayıt tarihi (GG.AA.YYYY formatında) - created_at'ten alınır
+  // Kayıt tarihi (GG.AA.YYYY HH:mm formatında) - created_at'ten alınır
   const getRecordDate = (): string => {
     if (isEditMode && editingDocument) {
-      return formatDocumentDateForDisplay(editingDocument.created_at)
+      return formatIsoToDisplayWithTime(editingDocument.created_at)
     }
     // Yeni kayıt modunda bugünün tarihi gösterilir (disabled)
     const now = new Date()
@@ -138,6 +143,10 @@ export function DocumentFormModal({
   // Form state
   const [form, setForm] = useState<FormState>({ ...INITIAL_FORM })
   const [saving, setSaving] = useState(false)
+
+  // Onay modalı state
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
+  const [pendingClassificationId, setPendingClassificationId] = useState<string | null>(null)
 
   /** Form alanını güncelle */
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -229,7 +238,26 @@ export function DocumentFormModal({
 
   /** Seçili gizlilik derecesi güvenlik kontrol no gerektiriyor mu? */
   const selectedClassification = classifications.find((c) => c.id === Number(form.classificationId))
-  const requiresSecurityNo = selectedClassification?.requires_security_number ?? false
+
+  // Tarih formatını analiz et (EVRAK | MESAJ)
+  const dateResult = parseDocumentDateInput(form.documentDateInput)
+  const documentType = dateResult.type // 'EVRAK' | 'MESAJ'
+
+  // Bu belge türü için güvenlik no disable mı? (MESAJ ise true, EVRAK ise gerektirmiyorsa true)
+  const isSecurityNoDisabled = isSecurityControlNoDisabled(
+    documentType,
+    selectedClassification?.requires_security_number ?? false
+  )
+
+  // Bu belge türü ve gizlilik derecesi için güvenlik no zorunlu mu? (Sadece EVRAK için geçerli)
+  const isSecurityNoRequired = isSecurityControlNoRequired(
+    documentType,
+    selectedClassification?.requires_security_number ?? false
+  )
+
+  // Güvenlik No alanı devre dışıysa içeriğini temizle (useEffect yerine save anında veya render'da yönetilebilir)
+  // ESLint: Calling setState synchronously within an effect... uyarısı için useEffect kaldırıldı.
+  // Save sırasında temizleyeceğiz.
 
   /** Formu kaydet */
   const handleSave = async (): Promise<void> => {
@@ -250,10 +278,9 @@ export function DocumentFormModal({
       showError('Tarihi alanı zorunludur')
       return
     }
-    if (!isValidDocumentDateInput(form.documentDateInput.trim())) {
-      showError(
-        'Tarihi alanı "dd.MM.yyyy" veya "d\'zoneLetter\' MMM yy" formatında olmalıdır (örn: 12.02.2026 veya 12C Şub 26)'
-      )
+    const dateValidation = validateDocumentDate(form.documentDateInput.trim())
+    if (!dateValidation.valid) {
+      showError(dateValidation.message || 'Tarih hatası')
       return
     }
     if (!form.subject.trim()) {
@@ -268,7 +295,7 @@ export function DocumentFormModal({
       showError('Gizlilik derecesi zorunludur')
       return
     }
-    if (requiresSecurityNo && !form.securityControlNo.trim()) {
+    if (isSecurityNoRequired && !form.securityControlNo.trim()) {
       showError('Güvenlik Kontrol No zorunludur')
       return
     }
@@ -288,6 +315,9 @@ export function DocumentFormModal({
     setSaving(true)
     let res
 
+    // Gerçek tarihi (ISO formatlı) hesapla
+    const isoDate = convertDocumentDateToIso(form.documentDateInput.trim())
+
     if (isEditMode && editingDocument) {
       // Güncelleme
       res = await incomingDocumentApi.update({
@@ -297,8 +327,9 @@ export function DocumentFormModal({
         reference_number: form.referenceNumber.trim(),
         subject: form.subject.trim(),
         document_date_input: form.documentDateInput.trim(),
+        document_date: isoDate || undefined,
         classification_id: Number(form.classificationId),
-        security_control_no: form.securityControlNo.trim() || undefined,
+        security_control_no: isSecurityNoDisabled ? null : form.securityControlNo.trim() || null,
         attachment_count: form.attachmentCount,
         page_count: form.pageCount,
         category_id: Number(form.categoryId),
@@ -312,8 +343,9 @@ export function DocumentFormModal({
         reference_number: form.referenceNumber.trim(),
         subject: form.subject.trim(),
         document_date_input: form.documentDateInput.trim(),
+        document_date: isoDate || undefined,
         classification_id: Number(form.classificationId),
-        security_control_no: form.securityControlNo.trim() || undefined,
+        security_control_no: isSecurityNoDisabled ? null : form.securityControlNo.trim() || null,
         attachment_count: form.attachmentCount,
         page_count: form.pageCount,
         category_id: Number(form.categoryId),
@@ -347,6 +379,11 @@ export function DocumentFormModal({
   const handleAfterSave = (): void => {
     // Tabloyu yenile
     onSuccess?.()
+
+    if (isEditMode) {
+      onClose()
+      return
+    }
 
     // Default değerlerle formu sıfırla
     const newForm = { ...INITIAL_FORM }
@@ -401,7 +438,7 @@ export function DocumentFormModal({
               borderColor: 'var(--mantine-color-gray-3)',
               backgroundColor: 'var(--mantine-color-white)',
               boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
-              maxWidth: '580px'
+              maxWidth: '540px'
             }}
           >
             <Text
@@ -442,7 +479,10 @@ export function DocumentFormModal({
                         cursor: 'not-allowed',
                         fontWeight: 500,
                         fontSize: '0.8rem',
-                        borderColor: 'var(--mantine-color-gray-3)'
+                        borderColor: 'var(--mantine-color-gray-3)',
+                        color: 'var(--mantine-color-deniz-8)',
+                        paddingLeft: 'var(--mantine-spacing-xs)',
+                        paddingRight: 'var(--mantine-spacing-xs)'
                       }
                     }}
                     style={{ width: '150px', flexShrink: 0 }}
@@ -473,7 +513,7 @@ export function DocumentFormModal({
                         backgroundColor: 'var(--mantine-color-deniz-0)',
                         borderColor: 'var(--mantine-color-deniz-3)',
                         cursor: 'not-allowed',
-                        fontWeight: 700,
+                        fontWeight: 500,
                         fontSize: '0.85rem',
                         textAlign: 'left',
                         color: 'var(--mantine-color-deniz-8)',
@@ -481,7 +521,7 @@ export function DocumentFormModal({
                         paddingRight: 'var(--mantine-spacing-xs)'
                       }
                     }}
-                    style={{ width: '180px', flexShrink: 0 }}
+                    style={{ width: '140px' }}
                   />
                 </Group>
               </Group>
@@ -511,7 +551,10 @@ export function DocumentFormModal({
                       cursor: 'not-allowed',
                       fontWeight: 500,
                       fontSize: '0.8rem',
-                      borderColor: 'var(--mantine-color-gray-3)'
+                      borderColor: 'var(--mantine-color-gray-3)',
+                      color: 'var(--mantine-color-deniz-8)',
+                      paddingLeft: 'var(--mantine-spacing-xs)',
+                      paddingRight: 'var(--mantine-spacing-xs)'
                     }
                   }}
                   style={{ width: '150px', flexShrink: 0 }}
@@ -784,10 +827,35 @@ export function DocumentFormModal({
                     }))}
                     value={form.classificationId || null}
                     onChange={(v) => {
-                      setField('classificationId', v ?? '')
-                      const cl = classifications.find((c) => c.id === Number(v))
-                      if (!cl?.requires_security_number) {
-                        setField('securityControlNo', '')
+                      const newValue = v ?? ''
+                      // 1. Yeni değer yoksa direkt güncelle
+                      if (!newValue) {
+                        setField('classificationId', '')
+                        return
+                      }
+
+                      // 2. Güvenlik No dolu mu?
+                      const hasSecurityNo =
+                        form.securityControlNo && form.securityControlNo.trim().length > 0
+                      if (!hasSecurityNo) {
+                        setField('classificationId', newValue)
+                        return
+                      }
+
+                      // 3. Yeni seçim Güvenlik No gerektiriyor mu?
+                      const newCl = classifications.find((c) => String(c.id) === newValue)
+                      const docType = parseDocumentDateInput(form.documentDateInput).type
+                      const newRequires = isSecurityControlNoRequired(
+                        docType,
+                        newCl?.requires_security_number ?? false
+                      )
+
+                      // 4. Gerektirmiyorsa ve doluysa onay iste
+                      if (!newRequires) {
+                        setPendingClassificationId(newValue)
+                        setConfirmationModalOpen(true)
+                      } else {
+                        setField('classificationId', newValue)
                       }
                     }}
                     searchable
@@ -818,15 +886,15 @@ export function DocumentFormModal({
                       display: 'block'
                     }}
                   >
-                    Güv.Kont.Nu{requiresSecurityNo ? ': *' : ':'}
+                    Güv.Kont.Nu{isSecurityNoRequired ? ': *' : ':'}
                   </Text>
                   <TextInput
                     size="xs"
-                    placeholder={requiresSecurityNo ? 'Zorunlu' : ''}
+                    placeholder="Güvenlik No"
                     value={form.securityControlNo}
                     onChange={(e) => setField('securityControlNo', e.currentTarget.value)}
-                    disabled={!requiresSecurityNo && form.classificationId !== ''}
-                    required={requiresSecurityNo}
+                    disabled={isSecurityNoDisabled}
+                    required={isSecurityNoRequired}
                     style={{ flex: 1, minWidth: 0 }}
                     styles={{
                       input: {
@@ -835,6 +903,14 @@ export function DocumentFormModal({
                         '&:focus': {
                           borderColor: 'var(--mantine-color-deniz-6)',
                           boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                        },
+                        '&:disabled': {
+                          backgroundColor: 'var(--mantine-color-gray-1)',
+                          cursor: 'not-allowed',
+                          borderColor: 'var(--mantine-color-gray-3)',
+                          color: 'var(--mantine-color-deniz-8)',
+                          paddingLeft: 'var(--mantine-spacing-xs)',
+                          paddingRight: 'var(--mantine-spacing-xs)'
                         }
                       }
                     }}
@@ -1018,6 +1094,50 @@ export function DocumentFormModal({
           </Group>
         </Stack>
       )}
+      <Modal
+        opened={confirmationModalOpen}
+        onClose={() => {
+          setConfirmationModalOpen(false)
+          setPendingClassificationId(null)
+        }}
+        title="Güvenlik No Silinecek"
+        centered
+        size="sm"
+        styles={{ title: { fontWeight: 600, fontSize: '0.9rem' } }}
+      >
+        <Stack>
+          <Text size="sm">
+            Güvenlik kontrol numarası gerektirmeyen bir gizlilik derecesi seçtiniz. Güvenlik kontrol
+            numarası silinecektir. Onaylıyor musunuz?
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="default"
+              size="xs"
+              onClick={() => {
+                setConfirmationModalOpen(false)
+                setPendingClassificationId(null)
+              }}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              color="red"
+              size="xs"
+              onClick={() => {
+                if (pendingClassificationId !== null) {
+                  setField('classificationId', pendingClassificationId)
+                  setField('securityControlNo', '')
+                }
+                setConfirmationModalOpen(false)
+                setPendingClassificationId(null)
+              }}
+            >
+              Onayla ve Sil
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Modal>
   )
 }
