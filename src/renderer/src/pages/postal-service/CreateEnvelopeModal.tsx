@@ -257,6 +257,7 @@ export default function CreateEnvelopeModal({
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>K.No</Table.Th>
+                <Table.Th>Sayı</Table.Th>
                 <Table.Th>Konu</Table.Th>
                 <Table.Th>Birim</Table.Th>
               </Table.Tr>
@@ -266,6 +267,7 @@ export default function CreateEnvelopeModal({
                 ? editingEnvelope?.distributions.map((d) => (
                     <Table.Tr key={d.distribution_id}>
                       <Table.Td>{d.document_id}</Table.Td>
+                      <Table.Td>{d.document_reference_number}</Table.Td>
                       <Table.Td>{d.document_subject}</Table.Td>
                       <Table.Td>
                         <Badge size="xs" variant="light">
@@ -277,6 +279,7 @@ export default function CreateEnvelopeModal({
                 : selectedDistributions.map((d) => (
                     <Table.Tr key={d.distribution_id}>
                       <Table.Td>{d.document_id}</Table.Td>
+                      <Table.Td>{d.document_reference_number}</Table.Td>
                       <Table.Td>{d.document_subject}</Table.Td>
                       <Table.Td>
                         <Badge size="xs" variant="light">
