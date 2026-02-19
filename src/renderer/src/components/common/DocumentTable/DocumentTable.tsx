@@ -35,6 +35,8 @@ export interface DocumentTableProps<T> {
   onRowClick?: (row: T) => void
   /** Satır çift tıklanınca çağrılır (düzenleme vb. için) */
   onRowDoubleClick?: (row: T) => void
+  /** Satır sağ tıklanınca çağrılır (bağlam menüsü açma için) */
+  onRowContextMenu?: (row: T, event: React.MouseEvent) => void
   /** Veri yokken gösterilecek mesaj */
   emptyMessage?: string
   /** Seçili satırın id'si — vurgulanır, tek satır seçimi */
@@ -53,6 +55,7 @@ export function DocumentTable<T extends object>({
   loading = false,
   onRowClick,
   onRowDoubleClick,
+  onRowContextMenu,
   emptyMessage = 'Henüz kayıt yok.',
   selectedRowId,
   viewportRef
@@ -157,6 +160,12 @@ export function DocumentTable<T extends object>({
                   data-row-id={rowId}
                   onClick={() => onRowClick?.(row)}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
+                  onContextMenu={(e: React.MouseEvent) => {
+                    if (onRowContextMenu) {
+                      e.preventDefault()
+                      onRowContextMenu(row, e)
+                    }
+                  }}
                   tabIndex={onRowClick || onRowDoubleClick ? 0 : undefined}
                   aria-selected={isSelected}
                   aria-current={isSelected ? 'true' : undefined}
@@ -167,7 +176,6 @@ export function DocumentTable<T extends object>({
                     isSelected
                       ? {
                           borderLeft: '3px solid var(--mantine-color-deniz-6)',
-                          fontWeight: 500,
                           userSelect: 'none'
                         }
                       : { userSelect: 'none' }

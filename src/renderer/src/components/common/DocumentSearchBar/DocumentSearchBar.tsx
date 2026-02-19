@@ -1,5 +1,5 @@
 // ============================================================
-// DocumentSearchBar - Evrak arama (K.No + genel) ve Yeni Evrak butonu
+// DocumentSearchBar - Evrak arama (K.No (id) + genel) ve Yeni Evrak butonu
 // K.No ayrı textbox; genel arama makam, sayı, konu, tarih vb.
 // ============================================================
 
@@ -7,10 +7,10 @@ import { TextInput, Button, Group, Box } from '@mantine/core'
 import { IconSearch, IconPlus } from '@tabler/icons-react'
 
 export interface DocumentSearchBarProps {
-  /** K.No arama değeri */
-  recordNoValue: string
+  /** K.No (id) arama değeri */
+  idValue: string
   /** K.No değişince */
-  onRecordNoChange: (value: string) => void
+  onIdChange: (value: string) => void
   /** Genel arama metni */
   value: string
   /** Genel arama değişince */
@@ -18,7 +18,7 @@ export interface DocumentSearchBarProps {
   /** Yeni evrak butonuna tıklanınca */
   onNewDocumentClick: () => void
   /** Enter ile arama tetiklenince */
-  onSearchSubmit?: (params: { recordNo: string; query: string }) => void
+  onSearchSubmit?: (params: { id: string; query: string }) => void
   /** Yeni evrak buton etiketi */
   newButtonLabel?: string
   /** Genel arama placeholder */
@@ -29,8 +29,8 @@ export interface DocumentSearchBarProps {
  * Evrak sayfaları için K.No + genel arama + Yeni Kayıt butonu.
  */
 export function DocumentSearchBar({
-  recordNoValue,
-  onRecordNoChange,
+  idValue,
+  onIdChange,
   value,
   onChange,
   onNewDocumentClick,
@@ -40,7 +40,7 @@ export function DocumentSearchBar({
 }: DocumentSearchBarProps): React.JSX.Element {
   const triggerSearch = (): void => {
     if (onSearchSubmit) {
-      onSearchSubmit({ recordNo: recordNoValue.trim(), query: value.trim() })
+      onSearchSubmit({ id: idValue.trim(), query: value.trim() })
     }
   }
 
@@ -51,7 +51,7 @@ export function DocumentSearchBar({
     }
   }
 
-  const handleRecordNoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+  const handleIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault()
       triggerSearch()
@@ -59,20 +59,14 @@ export function DocumentSearchBar({
   }
 
   return (
-    <Group
-      justify="space-between"
-      align="center"
-      gap="xs"
-      wrap="wrap"
-      style={{ width: '100%' }}
-    >
+    <Group justify="space-between" align="center" gap="xs" wrap="wrap" style={{ width: '100%' }}>
       <Group gap="xs" style={{ flex: 1, minWidth: 140 }}>
         <TextInput
           size="xs"
           placeholder="K.No"
-          value={recordNoValue}
-          onChange={(e) => onRecordNoChange(e.currentTarget.value.replace(/\D/g, ''))}
-          onKeyDown={handleRecordNoKeyDown}
+          value={idValue}
+          onChange={(e) => onIdChange(e.currentTarget.value.replace(/\D/g, ''))}
+          onKeyDown={handleIdKeyDown}
           aria-label="Kayıt numarası ile ara"
           w={70}
           style={{ flexShrink: 0 }}

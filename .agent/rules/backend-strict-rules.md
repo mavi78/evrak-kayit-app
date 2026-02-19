@@ -90,7 +90,7 @@ console.error('Operation failed')
 
 ## 5. Güvenlik Kuralları
 
-- Şifreler **asla** düz metin saklanmaz — `bcryptjs` ile hashlenir (SALT_ROUNDS = 10).
+- Şifreler **asla** düz metin saklanmaz — `bcryptjs` ile hashlenir (SALT_ROUNDS = 8).
 - Yanıtlarda şifre alanı **asla** döndürülmez — `stripPassword()` pattern'i uygulanır.
 - Rol hiyerarşisi: `system (4) > superadmin (3) > admin (2) > user (1)`. Her state-changing işlemde kontrol edilir.
 - `system` rolü arayüz veya API ile atanamaz; yalnızca seed ile oluşturulur ve asla silinemez.
@@ -105,7 +105,30 @@ Pencere kontrolü (`app:window-minimize`, `app:window-maximize`, vb.) ve splash 
 - **YASAK**: Modül iş mantığını `index.ts` içine koymak — modüller ServiceManager üzerinden kayıt edilir.
 - **YASAK**: Sistem kanallarında veritabanı veya iş mantığı işlemi yapmak.
 
-## 7. Dosya Başlık Bloğu — Zorunlu
+## 7. Eşzamanlı Erişim Korumaları
+
+Paylaşımlı SQLite veritabanında veri bütünlüğü için aşağıdaki mekanizmalar uygulanır:
+
+### SQLITE_BUSY Retry
+
+- `safeExecute()` ve `safeTransaction()` metotları `SQLITE_BUSY` hatasında otomatik yeniden deneme yapar.
+- Maksimum 3 deneme, artan bekleme süresiyle (200ms, 400ms, 600ms).
+- Tüm denemeler başarısızsa `AppError.busy()` (503) fırlatılır.
+
+### Optimistic Locking
+
+- `BaseRepository.update()` metodunda opsiyonel `_expected_updated_at` alanı ile çakışma kontrolü.
+- Eğer bu alan sağlanırsa, mevcut kaydın `updated_at` değeri karşılaştırılır.
+- Çakışma varsa `AppError.conflict()` (409) fırlatılır: "Bu kayıt başka bir kullanıcı tarafından güncellenmiş."
+- Frontend'den gönderilmesi opsiyoneldir; gönderilmezse kontrol atlanır.
+
+### Atomik Numara Üretimi
+
+- Sıralı numara gerektiren alanlar (örn. `day_sequence_no`) tek transaction içinde `MAX+1` sorgusu + `INSERT` ile üretilir.
+- Bu pattern `createWithAutoNumbers()` gibi repository metotlarında uygulanır.
+- **YASAK**: Numarayı ayrı sorguda alıp sonra ayrı sorguda oluşturmak — race condition riski.
+
+## 8. Dosya Başlık Bloğu — Zorunlu
 
 Her `.ts` dosyası açıklama bloğu ile başlar:
 

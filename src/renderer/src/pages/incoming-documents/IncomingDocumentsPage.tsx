@@ -13,18 +13,23 @@ import {
   DocumentTable,
   DocumentSearchBar,
   DocumentFormModal,
-  DocumentPagination
+  DocumentPagination,
+  DistributionTable,
+  DistributionModal,
+  DocumentContextMenu,
+  useDocumentContextMenu
 } from '@renderer/components/common'
 import { useDocumentSearch } from '@renderer/hooks/useDocumentSearch'
-import { incomingDocumentApi, classificationApi, unitApi } from '@renderer/lib/api'
-import { showError } from '@renderer/lib/notifications'
+import { incomingDocumentApi, classificationApi, unitApi, channelApi } from '@renderer/lib/api'
+import { showError, showSuccess } from '@renderer/lib/notifications'
+import { useConfirmModal } from '@renderer/hooks/useConfirmModal'
 import { getIncomingDocumentColumns } from './incomingDocumentColumns'
-import { DistributionTable } from './DistributionTable'
 import type {
   IncomingDocument,
-  IncomingDocumentDistribution,
+  DocumentDistribution,
   Classification,
-  Unit
+  Unit,
+  Channel
 } from '@shared/types'
 
 const PAGE_DESCRIPTION =
@@ -37,19 +42,24 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
-  const [recordNoSearch, setRecordNoSearch] = useState('')
+  const [idSearch, setIdSearch] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [classifications, setClassifications] = useState<Classification[]>([])
   const [units, setUnits] = useState<Unit[]>([])
+  const [channels, setChannels] = useState<Channel[]>([])
   const [selectedDoc, setSelectedDoc] = useState<IncomingDocument | null>(null)
   const [editingDoc, setEditingDoc] = useState<IncomingDocument | null>(null)
-  const [distributions, setDistributions] = useState<IncomingDocumentDistribution[]>([])
+  const [distributions, setDistributions] = useState<DocumentDistribution[]>([])
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false)
+  const [distModalOpened, { open: openDistModal, close: closeDistModal }] = useDisclosure(false)
+  const { contextMenu, openContextMenu, closeContextMenu } =
+    useDocumentContextMenu<IncomingDocument>()
+  const { confirm, ConfirmModal } = useConfirmModal()
 
   // Ref'ler — fetchAll'un bağımlılık dizisini sabit tutmak için
   const pageRef = useRef(page)
   const pageSizeRef = useRef(pageSize)
-  const recordNoSearchRef = useRef(recordNoSearch)
+  const idSearchRef = useRef(idSearch)
   const searchQueryRef = useRef(searchQuery)
 
   // Güncelleme sonrası scroll'u korumak için ref'ler
@@ -60,13 +70,13 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   // Ref'leri güncel tut
   pageRef.current = page
   pageSizeRef.current = pageSize
-  recordNoSearchRef.current = recordNoSearch
+  idSearchRef.current = idSearch
   searchQueryRef.current = searchQuery
   editingDocRef.current = editingDoc
 
   const fetchList = useCallback(
     async (params: {
-      recordNo?: number
+      id?: number
       query?: string
       page: number
       pageSize: number
@@ -102,9 +112,9 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
         if (editId != null) {
           pendingScrollToRowIdRef.current = editId
         }
-        const rn = recordNoSearchRef.current.trim()
+        const rn = idSearchRef.current.trim()
         void fetchList({
-          recordNo: rn ? parseInt(rn, 10) : undefined,
+          id: rn ? parseInt(rn, 10) : undefined,
           query: searchQueryRef.current.trim() || undefined,
           page: pageRef.current,
           pageSize: pageSizeRef.current,
@@ -118,20 +128,96 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   )
 
   const fetchSearch = useCallback(
-    (params: { recordNo?: number; query?: string }) => {
+    (params: { id?: number; query?: string }) => {
       void fetchList({ ...params, page: 1, pageSize: pageSizeRef.current })
     },
     [fetchList]
   )
 
   const loadDistributions = useCallback(async (docId: number): Promise<void> => {
-    const res = await incomingDocumentApi.getDistributions(docId)
+    const res = await incomingDocumentApi.getDistributions(docId, 'INCOMING')
     if (res.success) setDistributions(res.data)
     else setDistributions([])
   }, [])
 
+  /** Dağıtım tablosunda sağ tık ile kanal değiştirme */
+  const handleDistChannelChange = useCallback(
+    async (distributionId: number, newChannelId: number): Promise<void> => {
+      try {
+        const res = await incomingDocumentApi.updateDistribution({
+          id: distributionId,
+          channel_id: newChannelId
+        })
+        if (res.success) {
+          showSuccess('Dağıtım şekli güncellendi')
+          if (selectedDoc) void loadDistributions(selectedDoc.id)
+        } else {
+          showError(res.message)
+        }
+      } catch {
+        showError('Dağıtım şekli güncellenirken bir hata oluştu')
+      }
+    },
+    [loadDistributions, selectedDoc]
+  )
+
+  /** Dağıtım silme — posta zarfı uyarısı ile */
+  const handleDeleteDistribution = useCallback(
+    async (distributionId: number, isPostal?: boolean): Promise<void> => {
+      try {
+        // Posta kanalıyla gönderilmişse kullanıcıdan onay al
+        if (isPostal) {
+          const ok = await confirm({
+            title: 'Posta Zarfı Uyarısı',
+            message:
+              'Bu dağıtım bir posta zarfına bağlıdır.\n\n' +
+              'Silinirse posta zarfından çıkarılacak ve zarf boş kalırsa zarf tamamen silinecektir.\n\n' +
+              'Devam etmek istiyor musunuz?',
+            confirmLabel: 'Evet, Sil',
+            color: 'orange'
+          })
+          if (!ok) return
+        }
+
+        const res = await incomingDocumentApi.deleteDistribution(distributionId, isPostal)
+
+        // Backend posta uyarısı döndüyse (frontend isPostal kontrolünden geçmemiş olabilir)
+        if (!res.success && res.message === 'POSTAL_ENVELOPE_WARNING') {
+          const ok = await confirm({
+            title: 'Posta Zarfı Uyarısı',
+            message:
+              'Bu dağıtım bir posta zarfına bağlıdır.\n\n' +
+              'Silinirse posta zarfından çıkarılacak ve zarf boş kalırsa zarf tamamen silinecektir.\n\n' +
+              'Devam etmek istiyor musunuz?',
+            confirmLabel: 'Evet, Sil',
+            color: 'orange'
+          })
+          if (!ok) return
+          const retryRes = await incomingDocumentApi.deleteDistribution(distributionId, true)
+          if (retryRes.success) {
+            showSuccess('Dağıtım silindi')
+            if (selectedDoc) void loadDistributions(selectedDoc.id)
+          } else {
+            showError(retryRes.message)
+          }
+          return
+        }
+
+        if (res.success) {
+          showSuccess('Dağıtım silindi')
+          if (selectedDoc) void loadDistributions(selectedDoc.id)
+        } else {
+          showError(res.message)
+        }
+      } catch {
+        showError('Dağıtım silinirken bir hata oluştu')
+      }
+    },
+    [loadDistributions, selectedDoc, confirm]
+  )
+
   useDocumentSearch({
-    recordNoValue: recordNoSearch,
+    idValue: idSearch,
     query: searchQuery,
     minChars: 3,
     debounceMs: 300,
@@ -145,6 +231,9 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
     })
     unitApi.getAll().then((res) => {
       if (res.success) setUnits(res.data)
+    })
+    channelApi.getAll().then((res) => {
+      if (res.success) setChannels(res.data)
     })
   }, [])
 
@@ -171,12 +260,30 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
     [loadDistributions]
   )
 
+  /** Context menu 'Havale/Dağıtım' aksiyonu → modal aç */
+  const handleDistribution = useCallback(
+    (row: IncomingDocument): void => {
+      setSelectedDoc(row)
+      openDistModal()
+    },
+    [openDistModal]
+  )
+
   const handleRowDoubleClick = useCallback(
     (row: IncomingDocument): void => {
       setEditingDoc(row)
       openModal()
     },
     [openModal]
+  )
+
+  const handleRowContextMenu = useCallback(
+    (row: IncomingDocument, event: React.MouseEvent): void => {
+      setSelectedDoc(row)
+      void loadDistributions(row.id)
+      openContextMenu(row, event)
+    },
+    [loadDistributions, openContextMenu]
   )
 
   const handleNewDocument = useCallback(() => {
@@ -190,7 +297,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
       fetchAll(true)
     } else {
       // Yeni kayıt: arama alanlarını temizle, seçimi sıfırla ve başa dön
-      setRecordNoSearch('')
+      setIdSearch('')
       setSearchQuery('')
       setSelectedDoc(null)
       setDistributions([])
@@ -201,29 +308,29 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   const handlePageChange = useCallback(
     (p: number) => {
       setPage(p)
-      const rn = recordNoSearch.trim() ? parseInt(recordNoSearch, 10) : undefined
+      const rn = idSearch.trim() ? parseInt(idSearch, 10) : undefined
       void fetchList({
-        recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
+        id: rn && !Number.isNaN(rn) ? rn : undefined,
         query: searchQuery.trim() || undefined,
         page: p,
         pageSize
       })
     },
-    [fetchList, recordNoSearch, searchQuery, pageSize]
+    [fetchList, idSearch, searchQuery, pageSize]
   )
 
   const handlePageSizeChange = useCallback(
     (newSize: number) => {
       setPageSize(newSize)
-      const rn = recordNoSearch.trim() ? parseInt(recordNoSearch, 10) : undefined
+      const rn = idSearch.trim() ? parseInt(idSearch, 10) : undefined
       void fetchList({
-        recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
+        id: rn && !Number.isNaN(rn) ? rn : undefined,
         query: searchQuery.trim() || undefined,
         page: 1,
         pageSize: newSize
       })
     },
-    [fetchList, recordNoSearch, searchQuery]
+    [fetchList, idSearch, searchQuery]
   )
 
   const columns = getIncomingDocumentColumns(classifications)
@@ -252,17 +359,17 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
       {/* Arama ve Yeni Evrak butonu — ayrı kart */}
       <Card withBorder shadow="sm" radius="md" padding="xs" style={{ flexShrink: 0 }}>
         <DocumentSearchBar
-          recordNoValue={recordNoSearch}
-          onRecordNoChange={setRecordNoSearch}
+          idValue={idSearch}
+          onIdChange={setIdSearch}
           value={searchQuery}
           onChange={setSearchQuery}
           onNewDocumentClick={handleNewDocument}
-          onSearchSubmit={({ recordNo, query }) => {
-            if (!recordNo && !query) void fetchAll(false)
+          onSearchSubmit={({ id, query }) => {
+            if (!id && !query) void fetchAll(false)
             else {
-              const rn = recordNo ? parseInt(recordNo, 10) : undefined
+              const rn = id ? parseInt(id, 10) : undefined
               void fetchSearch({
-                recordNo: rn && !Number.isNaN(rn) ? rn : undefined,
+                id: rn && !Number.isNaN(rn) ? rn : undefined,
                 query: query || undefined
               })
             }
@@ -296,6 +403,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
             loading={loading}
             onRowClick={handleRowClick}
             onRowDoubleClick={handleRowDoubleClick}
+            onRowContextMenu={handleRowContextMenu}
             emptyMessage="Henüz kayıt yok."
             selectedRowId={selectedDoc?.id}
             viewportRef={scrollViewportRef}
@@ -315,7 +423,13 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
         <Text fw={700} size="sm" mb="xs" tt="uppercase">
           HAVALE/DAĞITIM
         </Text>
-        <DistributionTable distributions={distributions} units={units} />
+        <DistributionTable
+          distributions={distributions}
+          units={units}
+          channels={channels}
+          onChannelChange={handleDistChannelChange}
+          onDeleteDistribution={handleDeleteDistribution}
+        />
       </Card>
 
       <DocumentFormModal
@@ -328,6 +442,30 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
         scope="INCOMING"
         editingDocument={editingDoc}
       />
+
+      <DocumentContextMenu<IncomingDocument>
+        state={contextMenu}
+        onClose={closeContextMenu}
+        onEdit={handleRowDoubleClick}
+        onDistribution={handleDistribution}
+        onDismiss={() => {
+          setSelectedDoc(null)
+          setDistributions([])
+        }}
+      />
+
+      <DistributionModal
+        opened={distModalOpened}
+        onClose={closeDistModal}
+        documentId={selectedDoc?.id ?? null}
+        documentScope="INCOMING"
+        units={units}
+        channels={channels}
+        onDistributionsChange={() => {
+          if (selectedDoc) void loadDistributions(selectedDoc.id)
+        }}
+      />
+      {ConfirmModal}
     </Box>
   )
 }

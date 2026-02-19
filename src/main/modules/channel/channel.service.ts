@@ -48,7 +48,8 @@ export class ChannelService extends BaseService<Channel> {
       name: input.name.trim(),
       sort_order: input.sort_order ?? 0,
       is_default: isDefault,
-      is_active: input.is_active ?? true
+      is_active: input.is_active ?? true,
+      is_senet_required: input.is_senet_required ?? true
     })
     return this.created(item, 'Kanal oluşturuldu')
   }
@@ -64,6 +65,7 @@ export class ChannelService extends BaseService<Channel> {
     if (input.sort_order !== undefined) fields.sort_order = input.sort_order
     if (input.is_default !== undefined) fields.is_default = input.is_default
     if (input.is_active !== undefined) fields.is_active = input.is_active
+    if (input.is_senet_required !== undefined) fields.is_senet_required = input.is_senet_required
     const item = this.repository.update(id, fields)
     return this.ok(item, 'Kanal güncellendi')
   }

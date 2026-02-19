@@ -4,7 +4,8 @@
 // ============================================================
 
 import { useReducer, useCallback, type ReactNode } from 'react'
-import { authApi } from '@renderer/lib/api'
+import { authApi, appSettingsApi } from '@renderer/lib/api'
+import { notifications } from '@mantine/notifications'
 import { AuthContext, authReducer, initialState, type AuthContextValue } from './auth-context-def'
 import { PUBLIC_PAGES, type PageKey } from '@shared/utils'
 import { ROLE_HIERARCHY, type LoginRequest, type UserRole } from '@shared/types'
@@ -22,6 +23,19 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
           user: response.data.user,
           permissions: response.data.permissions,
           roleVisibilityDefaults: response.data.role_visibility_defaults ?? []
+        }
+      })
+
+      // Birlik kayıt kontrolü — arka planda çalışır, login'i bloklamaz
+      appSettingsApi.getOrganization().then((res) => {
+        if (res.success && (!res.data || !res.data.value)) {
+          notifications.show({
+            id: 'org-unit-warning',
+            title: 'Birlik Kayıtlı Değil',
+            message: 'Lütfen Ayarlar → Genel Ayarlar sayfasından birliğinizi seçin.',
+            color: 'yellow',
+            autoClose: false
+          })
         }
       })
     } else {

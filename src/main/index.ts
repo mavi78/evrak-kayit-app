@@ -24,6 +24,9 @@ import { ChannelService } from './modules/channel/channel.service'
 import { FolderService } from './modules/folder/folder.service'
 import { CategoryService } from './modules/category/category.service'
 import { IncomingDocumentService } from './modules/incoming-document/incoming-document.service'
+import { AppSettingsService } from './modules/app-settings/app-settings.service'
+import { PostalStampService } from './modules/postal-stamp/postal-stamp.service'
+import { PostalEnvelopeService } from './modules/postal-envelope/postal-envelope.service'
 
 import type { LoadingProgressPayload } from '@shared/types'
 
@@ -85,6 +88,9 @@ async function runBackendInit(splashWindow: BrowserWindow): Promise<ServiceManag
   serviceManager.register(new FolderService())
   serviceManager.register(new CategoryService())
   serviceManager.register(new IncomingDocumentService())
+  serviceManager.register(new AppSettingsService())
+  serviceManager.register(new PostalStampService())
+  serviceManager.register(new PostalEnvelopeService())
   serviceManager.initialize((moduleName) => {
     sendProgress(splashWindow, {
       step: 'service',

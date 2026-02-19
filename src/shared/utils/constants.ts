@@ -18,7 +18,10 @@ export const PAGE_KEYS = {
   SETTINGS_CATEGORIES: 'settings-categories',
   LOGS: 'logs',
   COURIER_DELIVERED: 'courier-delivered',
-  COURIER_NOT_DELIVERED: 'courier-not-delivered'
+  COURIER_NOT_DELIVERED: 'courier-not-delivered',
+  SETTINGS_APP_GENERAL: 'settings-app-general',
+  SETTINGS_POSTAL_STAMPS: 'settings-postal-stamps',
+  POSTAL_SERVICE: 'postal-service'
 } as const
 
 export type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
@@ -39,7 +42,10 @@ export const MENU_PAGE_KEYS: readonly PageKey[] = [
   PAGE_KEYS.SETTINGS_FOLDERS,
   PAGE_KEYS.SETTINGS_CATEGORIES,
   PAGE_KEYS.COURIER_DELIVERED,
-  PAGE_KEYS.COURIER_NOT_DELIVERED
+  PAGE_KEYS.COURIER_NOT_DELIVERED,
+  PAGE_KEYS.SETTINGS_APP_GENERAL,
+  PAGE_KEYS.SETTINGS_POSTAL_STAMPS,
+  PAGE_KEYS.POSTAL_SERVICE
 ] as const
 
 export type MenuPageKey = (typeof MENU_PAGE_KEYS)[number]
@@ -61,7 +67,10 @@ export const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
   PAGE_KEYS.SETTINGS_FOLDERS,
   PAGE_KEYS.SETTINGS_CATEGORIES,
   PAGE_KEYS.COURIER_DELIVERED,
-  PAGE_KEYS.COURIER_NOT_DELIVERED
+  PAGE_KEYS.COURIER_NOT_DELIVERED,
+  PAGE_KEYS.SETTINGS_APP_GENERAL,
+  PAGE_KEYS.SETTINGS_POSTAL_STAMPS,
+  PAGE_KEYS.POSTAL_SERVICE
 ] as const
 
 /** HTTP benzeri durum kodları */

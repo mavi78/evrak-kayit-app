@@ -76,13 +76,13 @@ export function formatForLogFileName(date?: Date): string {
 }
 
 /**
- * Log satırı için yyyy-MM-dd HH:mm:ss formatında formatlar
+ * Log satırı için yyyy-MM-dd HH:mm:ss formatında formatlar.
+ * formatForDatabase ile aynı çıktıyı üretir (sayısal format, locale etkisiz).
  * @param date - Date nesnesi (opsiyonel, varsayılan: şimdi)
  * @returns yyyy-MM-dd HH:mm:ss formatında tarih
  */
 export function formatForLogLine(date?: Date): string {
-  const dateObj = date ?? new Date()
-  return format(dateObj, 'yyyy-MM-dd HH:mm:ss', { locale: tr })
+  return formatForDatabase(date)
 }
 
 /**
@@ -106,12 +106,12 @@ export function formatIsoToDisplayWithTime(isoString: string | null | undefined)
   if (!isoString) return '—'
   const dateObj = new Date(isoString)
   if (Number.isNaN(dateObj.getTime())) return '—'
-  
+
   // Eğer sadece tarih varsa (saat yoksa), sadece tarih döndür
   const hasTime = isoString.includes(' ') || isoString.includes('T')
   if (!hasTime) {
     return format(dateObj, 'dd.MM.yyyy', { locale: tr })
   }
-  
+
   return format(dateObj, 'dd.MM.yyyy HH:mm', { locale: tr })
 }

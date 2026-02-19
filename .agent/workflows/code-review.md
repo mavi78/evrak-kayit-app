@@ -43,7 +43,7 @@ Kod yazdıktan sonra veya mevcut kodu incelerken aşağıdaki kontrol listesi uy
 - [ ] UI bileşenleri sadece Mantine'den
 - [ ] İkonlar sadece `@tabler/icons-react`'tan
 - [ ] Ham HTML elementleri yok (button, input, select, table)
-- [ ] Inline style yok
+- [ ] Ham inline style yok (Mantine `style` prop'u hariç)
 - [ ] DOM manipülasyonu yok (`document.getElementById` vb.)
 - [ ] API çağrıları `lib/api.ts` üzerinden
 - [ ] `response.success` kontrolü var

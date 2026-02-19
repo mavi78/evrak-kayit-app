@@ -126,22 +126,22 @@ serviceManager.register(new YourService())
 
 ### BaseRepository<T> — Miras Alınan Özellikler
 
-| Metod                 | Açıklama                     | Override?   |
-| --------------------- | ---------------------------- | ----------- |
-| `getTableName()`      | Tablo adı                    | **Zorunlu** |
-| `getTableSchemas()`   | CREATE TABLE SQL'leri        | **Zorunlu** |
-| `getBooleanColumns()` | Boolean kolon listesi        | Gerekirse   |
-| `findAll()`           | Tüm kayıtlar (DESC)          | Nadiren     |
-| `findById(id)`        | ID ile tek kayıt             | Nadiren     |
-| `findBy(col, val)`    | Kolona göre çoklu kayıt      | Hayır       |
-| `findOneBy(col, val)` | Kolona göre tek kayıt        | Hayır       |
-| `create(data)`        | Yeni kayıt oluştur           | Hayır       |
-| `update(id, data)`    | Kayıt güncelle (+updated_at) | Hayır       |
-| `delete(id)`          | Kayıt sil                    | Hayır       |
-| `exists(id)`          | Var mı kontrolü              | Hayır       |
-| `count()`             | Toplam kayıt sayısı          | Hayır       |
-| `safeExecute(fn)`     | Güvenli DB işlemi            | Hayır       |
-| `safeTransaction(fn)` | Atomik transaction           | Hayır       |
+| Metod                 | Açıklama                                  | Override?   |
+| --------------------- | ----------------------------------------- | ----------- |
+| `getTableName()`      | Tablo adı                                 | **Zorunlu** |
+| `getTableSchemas()`   | CREATE TABLE SQL'leri                     | **Zorunlu** |
+| `getBooleanColumns()` | Boolean kolon listesi                     | Gerekirse   |
+| `findAll()`           | Tüm kayıtlar (DESC)                       | Nadiren     |
+| `findById(id)`        | ID ile tek kayıt                          | Nadiren     |
+| `findBy(col, val)`    | Kolona göre çoklu kayıt                   | Hayır       |
+| `findOneBy(col, val)` | Kolona göre tek kayıt                     | Hayır       |
+| `create(data)`        | Yeni kayıt oluştur                        | Hayır       |
+| `update(id, data)`    | Kayıt güncelle (+updated_at)              | Hayır       |
+| `delete(id)`          | Kayıt sil                                 | Hayır       |
+| `exists(id)`          | Var mı kontrolü                           | Hayır       |
+| `count()`             | Toplam kayıt sayısı                       | Hayır       |
+| `safeExecute(fn)`     | Güvenli DB işlemi (SQLITE_BUSY retry ×3)  | Hayır       |
+| `safeTransaction(fn)` | Atomik transaction (SQLITE_BUSY retry ×3) | Hayır       |
 
 ### BaseService<T> — Miras Alınan Özellikler
 
@@ -196,12 +196,14 @@ BaseRepository `safeExecute` içinde SQLite hatalarını otomatik çevirir:
 
 ## Güvenlik Kontrol Listesi
 
-- [ ] Şifreler `bcryptjs` ile hashlenmiş (SALT_ROUNDS = 10)
+- [ ] Şifreler `bcryptjs` ile hashlenmiş (SALT_ROUNDS = 8)
 - [ ] Yanıtlarda şifre alanı `stripPassword()` ile çıkarılmış
 - [ ] Rol hiyerarşisi kontrol edilmiş (system > superadmin > admin > user)
 - [ ] State-changing işlemlerde audit log yazılmış
 - [ ] SQL sorgularında parameterized query (`?`) kullanılmış
 - [ ] Boolean alanlar `getBooleanColumns()` ile tanımlı
+- [ ] Sıralı numara üretimi atomik transaction içinde yapılmış
+- [ ] Eşzamanlı güncelleme riski varsa optimistic locking (`_expected_updated_at`) değerlendirilmiş
 
 ---
 

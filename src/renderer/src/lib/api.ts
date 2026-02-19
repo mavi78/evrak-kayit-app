@@ -35,14 +35,27 @@ import type {
   UpdateUnitHierarchyRequest,
   UpdateUnitSortOrderRequest,
   IncomingDocument,
-  IncomingDocumentDistribution,
+  DocumentDistribution,
   CreateIncomingDocumentRequest,
   UpdateIncomingDocumentRequest,
   SearchIncomingDocumentsRequest,
   PaginatedIncomingDocumentsResponse,
   NextRecordInfoResponse,
-  CreateIncomingDocumentDistributionRequest,
-  UpdateIncomingDocumentDistributionRequest
+  CreateDistributionRequest,
+  UpdateDistributionRequest,
+  DeliverDistributionRequest,
+  DocumentScope,
+  AppSetting,
+  AppSettingKey,
+  SetSettingRequest,
+  PostalStamp,
+  CreatePostalStampRequest,
+  UpdatePostalStampRequest,
+  PostalEnvelope,
+  PostalEnvelopeDetail,
+  PendingPostalDistribution,
+  CreatePostalEnvelopeRequest,
+  UpdatePostalEnvelopeRequest
 } from '@shared/types'
 
 /**
@@ -239,19 +252,89 @@ export const incomingDocumentApi = {
   delete: (id: number): Promise<ServiceResponse<boolean>> =>
     invoke<boolean>('incoming-document:delete', { id }),
   getDistributions: (
-    incomingDocumentId: number
-  ): Promise<ServiceResponse<IncomingDocumentDistribution[]>> =>
-    invoke<IncomingDocumentDistribution[]>('incoming-document:get-distributions', {
-      incoming_document_id: incomingDocumentId
+    documentId: number,
+    documentScope: DocumentScope
+  ): Promise<ServiceResponse<DocumentDistribution[]>> =>
+    invoke<DocumentDistribution[]>('incoming-document:get-distributions', {
+      document_id: documentId,
+      document_scope: documentScope
     }),
   addDistribution: (
-    data: CreateIncomingDocumentDistributionRequest
-  ): Promise<ServiceResponse<IncomingDocumentDistribution>> =>
-    invoke<IncomingDocumentDistribution>('incoming-document:add-distribution', data),
+    data: CreateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution>> =>
+    invoke<DocumentDistribution>('incoming-document:add-distribution', data),
   updateDistribution: (
-    data: UpdateIncomingDocumentDistributionRequest
-  ): Promise<ServiceResponse<IncomingDocumentDistribution | null>> =>
-    invoke<IncomingDocumentDistribution | null>('incoming-document:update-distribution', data),
-  deleteDistribution: (id: number): Promise<ServiceResponse<boolean>> =>
-    invoke<boolean>('incoming-document:delete-distribution', { id })
+    data: UpdateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> =>
+    invoke<DocumentDistribution | null>('incoming-document:update-distribution', data),
+  deleteDistribution: (
+    id: number,
+    forcePostalDelete?: boolean
+  ): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('incoming-document:delete-distribution', {
+      id,
+      force_postal_delete: forcePostalDelete
+    }),
+  deliverDistribution: (
+    data: DeliverDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> =>
+    invoke<DocumentDistribution | null>('incoming-document:deliver-distribution', data)
+}
+
+// ============================================================
+// UYGULAMA AYARLARI API
+// ============================================================
+
+export const appSettingsApi = {
+  get: (key: AppSettingKey): Promise<ServiceResponse<AppSetting | null>> =>
+    invoke<AppSetting | null>('app-settings:get', { key }),
+
+  set: (data: SetSettingRequest): Promise<ServiceResponse<AppSetting>> =>
+    invoke<AppSetting>('app-settings:set', data),
+
+  getOrganization: (): Promise<ServiceResponse<AppSetting | null>> =>
+    invoke<AppSetting | null>('app-settings:get-organization')
+}
+
+// ============================================================
+// POSTA PULU API
+// ============================================================
+
+export const postalStampApi = {
+  getAll: (): Promise<ServiceResponse<PostalStamp[]>> =>
+    invoke<PostalStamp[]>('postal-stamp:get-all'),
+  getById: (id: number): Promise<ServiceResponse<PostalStamp>> =>
+    invoke<PostalStamp>('postal-stamp:get-by-id', { id }),
+  create: (data: CreatePostalStampRequest): Promise<ServiceResponse<PostalStamp>> =>
+    invoke<PostalStamp>('postal-stamp:create', data),
+  update: (data: UpdatePostalStampRequest): Promise<ServiceResponse<PostalStamp>> =>
+    invoke<PostalStamp>('postal-stamp:update', data),
+  delete: (id: number): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('postal-stamp:delete', { id })
+}
+
+// ============================================================
+// POSTA ZARFI API
+// ============================================================
+
+export const postalEnvelopeApi = {
+  /** Bekleyenler havuzu — posta kanalı + zarflanmamış dağıtımlar */
+  getPending: (): Promise<ServiceResponse<PendingPostalDistribution[]>> =>
+    invoke<PendingPostalDistribution[]>('postal-envelope:get-pending'),
+
+  /** Zarf oluşturma (evraklar + pullar) */
+  createEnvelope: (data: CreatePostalEnvelopeRequest): Promise<ServiceResponse<PostalEnvelope>> =>
+    invoke<PostalEnvelope>('postal-envelope:create-envelope', data),
+
+  /** Tek zarf detayı */
+  getEnvelopeDetail: (id: number): Promise<ServiceResponse<PostalEnvelopeDetail>> =>
+    invoke<PostalEnvelopeDetail>('postal-envelope:get-envelope-detail', { id }),
+
+  /** Tüm geçmiş zarflar */
+  getAllEnvelopes: (): Promise<ServiceResponse<PostalEnvelopeDetail[]>> =>
+    invoke<PostalEnvelopeDetail[]>('postal-envelope:get-all-envelopes'),
+
+  /** Zarf güncelleme (alıcı adı + RR Kod + pullar) */
+  updateEnvelope: (data: UpdatePostalEnvelopeRequest): Promise<ServiceResponse<PostalEnvelope>> =>
+    invoke<PostalEnvelope>('postal-envelope:update-envelope', data)
 }

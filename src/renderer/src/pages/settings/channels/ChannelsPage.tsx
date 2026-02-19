@@ -94,6 +94,9 @@ function SortableItem({ item, onEdit, onDelete }: SortableItemProps): React.JSX.
           Varsayılan
         </Badge>
       )}
+      <Badge size="sm" color={item.is_senet_required ? 'teal' : 'orange'} variant="light">
+        {item.is_senet_required ? 'Senet Gerekli' : 'Senet Yok'}
+      </Badge>
       <Badge size="sm" color={item.is_active ? 'green' : 'gray'} variant="light">
         {item.is_active ? 'Aktif' : 'Pasif'}
       </Badge>
@@ -144,7 +147,13 @@ export default function ChannelsPage(): React.JSX.Element {
   }, [fetchItems])
 
   const createForm = useForm<CreateChannelRequest>({
-    initialValues: { name: '', sort_order: 0, is_default: false, is_active: true },
+    initialValues: {
+      name: '',
+      sort_order: 0,
+      is_default: false,
+      is_active: true,
+      is_senet_required: true
+    },
     validate: { name: (v) => (!v?.trim() ? 'Kanal adı zorunludur' : null) }
   })
 
@@ -154,9 +163,17 @@ export default function ChannelsPage(): React.JSX.Element {
       sort_order: number
       is_default: boolean
       is_active: boolean
+      is_senet_required: boolean
     }
   >({
-    initialValues: { id: 0, name: '', sort_order: 0, is_default: false, is_active: true }
+    initialValues: {
+      id: 0,
+      name: '',
+      sort_order: 0,
+      is_default: false,
+      is_active: true,
+      is_senet_required: true
+    }
   })
 
   const openEditModal = (row: Channel): void => {
@@ -166,7 +183,8 @@ export default function ChannelsPage(): React.JSX.Element {
       name: row.name,
       sort_order: row.sort_order,
       is_default: row.is_default,
-      is_active: row.is_active
+      is_active: row.is_active,
+      is_senet_required: row.is_senet_required
     })
     openEdit()
   }
@@ -189,6 +207,7 @@ export default function ChannelsPage(): React.JSX.Element {
       sort_order: number
       is_default: boolean
       is_active: boolean
+      is_senet_required: boolean
     }
   ): Promise<void> => {
     if (!values.id) return
@@ -343,6 +362,11 @@ export default function ChannelsPage(): React.JSX.Element {
               label="Aktif"
               {...createForm.getInputProps('is_active', { type: 'checkbox' })}
             />
+            <Switch
+              label="Senet Gerekli"
+              description="Teslim işleminde senet numarası üretilsin mi?"
+              {...createForm.getInputProps('is_senet_required', { type: 'checkbox' })}
+            />
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={closeCreate}>
                 İptal
@@ -365,6 +389,11 @@ export default function ChannelsPage(): React.JSX.Element {
               {...editForm.getInputProps('is_default', { type: 'checkbox' })}
             />
             <Switch label="Aktif" {...editForm.getInputProps('is_active', { type: 'checkbox' })} />
+            <Switch
+              label="Senet Gerekli"
+              description="Teslim işleminde senet numarası üretilsin mi?"
+              {...editForm.getInputProps('is_senet_required', { type: 'checkbox' })}
+            />
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={closeEdit}>
                 İptal

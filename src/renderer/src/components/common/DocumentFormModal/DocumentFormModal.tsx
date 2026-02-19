@@ -27,6 +27,7 @@ import {
   incomingDocumentApi
 } from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
+import { useConfirmModal } from '@renderer/hooks/useConfirmModal'
 import type {
   DocumentScope,
   Channel,
@@ -118,6 +119,7 @@ export function DocumentFormModal({
 }: DocumentFormModalProps): React.JSX.Element {
   const isEditMode = editingDocument != null
   const modalTitle = title ?? (isEditMode ? 'Evrak Düzenle' : SCOPE_TITLES[scope])
+  const { confirm, ConfirmModal } = useConfirmModal()
 
   // Kayıt tarihi (GG.AA.YYYY HH:mm formatında) - created_at'ten alınır
   const getRecordDate = (): string => {
@@ -171,7 +173,7 @@ export function DocumentFormModal({
 
       // Düzenleme modunda mevcut verileri yükle
       if (isEditMode && editingDocument) {
-        newForm.recordNo = String(editingDocument.record_no)
+        newForm.recordNo = String(editingDocument.id)
         newForm.daySequenceNo = String(editingDocument.day_sequence_no)
         newForm.channelId = String(editingDocument.channel_id)
         newForm.sourceOffice = editingDocument.source_office
@@ -368,7 +370,13 @@ export function DocumentFormModal({
   const handleDelete = async (): Promise<void> => {
     if (!isEditMode || !editingDocument || !onDelete) return
 
-    if (window.confirm('Bu evrakı silmek istediğinizden emin misiniz?')) {
+    const ok = await confirm({
+      title: 'Evrak Silme',
+      message: 'Bu evrakı silmek istediğinizden emin misiniz?',
+      confirmLabel: 'Evet, Sil',
+      color: 'red'
+    })
+    if (ok) {
       await onDelete(editingDocument.id)
       onSuccess?.()
       onClose()
@@ -1155,6 +1163,7 @@ export function DocumentFormModal({
           </Group>
         </Stack>
       </Modal>
+      {ConfirmModal}
     </Modal>
   )
 }

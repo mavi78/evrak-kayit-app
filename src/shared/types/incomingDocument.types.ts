@@ -13,8 +13,8 @@ export type DocumentScope = 'INCOMING' | 'OUTGOING' | 'TRANSIT'
 
 /** Modal açıldığında gösterilecek otomatik kayıt bilgileri */
 export interface NextRecordInfoResponse {
-  /** Sıradaki kayıt numarası */
-  recordNo: number
+  /** Sıradaki kayıt numarası (id) */
+  nextId: number
   /** Bugünün tarihi (GG.AA.YYYY) */
   recordDate: string
   /** Bugünkü gün sıra numarası */
@@ -23,7 +23,6 @@ export interface NextRecordInfoResponse {
 
 /** Gelen evrak ana kaydı */
 export interface IncomingDocument extends BaseEntity {
-  record_no: number
   record_date: string
   day_sequence_no: number
   channel_id: number
@@ -42,13 +41,17 @@ export interface IncomingDocument extends BaseEntity {
   folder_id: number
 }
 
-/** Havale / dağıtım kaydı (evrak-birlik eşleşmesi) */
-export interface IncomingDocumentDistribution extends BaseEntity {
-  incoming_document_id: number
+/** Dağıtım kaydı (3 sayfa ortak: INCOMING/OUTGOING/TRANSIT) */
+export interface DocumentDistribution extends BaseEntity {
+  document_id: number
+  document_scope: DocumentScope
   unit_id: number
-  distribution_type: string
-  delivery_date: string
-  receipt_no: string
+  parent_unit_id: number | null
+  channel_id: number
+  is_delivered: boolean
+  delivery_date: string | null
+  receipt_no: number | null
+  postal_envelope_id: number | null
 }
 
 /** Tarihi alanından çıkarılan sonuç (frontend/backend ortak) */
@@ -93,10 +96,10 @@ export interface UpdateIncomingDocumentRequest {
   folder_id?: number
 }
 
-/** Arama — K.No ayrı filtre, genel metin diğer sütunlarda, sayfalama */
+/** Arama — K.No (id) ayrı filtre, genel metin diğer sütunlarda, sayfalama */
 export interface SearchIncomingDocumentsRequest {
-  /** K.No ile tam eşleşme (ayrı textbox) */
-  recordNo?: number
+  /** K.No (id) ile tam eşleşme (ayrı textbox) */
+  id?: number
   /** Makam, sayı, konu, tarih vb. genel arama */
   query?: string
   /** Sayfa numarası (1 tabanlı) */
@@ -113,20 +116,24 @@ export interface PaginatedIncomingDocumentsResponse {
   pageSize: number
 }
 
-/** Havale/dağıtım ekleme */
-export interface CreateIncomingDocumentDistributionRequest {
-  incoming_document_id: number
+// ---- Dağıtım Request Tipleri ----
+
+/** Dağıtım ekleme — parent_unit_id backend'de otomatik atanır */
+export interface CreateDistributionRequest {
+  document_id: number
+  document_scope: DocumentScope
   unit_id: number
-  distribution_type: string
-  delivery_date: string
-  receipt_no: string
+  channel_id: number
 }
 
-/** Havale/dağıtım güncelleme */
-export interface UpdateIncomingDocumentDistributionRequest {
+/** Dağıtım güncelleme */
+export interface UpdateDistributionRequest {
   id: number
   unit_id?: number
-  distribution_type?: string
-  delivery_date?: string
-  receipt_no?: string
+  channel_id?: number
+}
+
+/** Teslim işlemi — senet no atomik üretilir, geri alınamaz */
+export interface DeliverDistributionRequest {
+  id: number
 }

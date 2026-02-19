@@ -16,7 +16,7 @@ export function getIncomingDocumentColumns(
   classifications: Classification[]
 ): DocumentTableColumn<IncomingDocument>[] {
   return [
-    { key: 'record_no', label: 'K.NO' },
+    { key: 'id', label: 'K.NO' },
     {
       key: 'day_sequence_no',
       label: (

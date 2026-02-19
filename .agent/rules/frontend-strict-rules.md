@@ -32,7 +32,7 @@ src/renderer/src/
 - **Sadece fonksiyonel bileşen** kullanılır — class component YASAK.
 - Her bileşen açık `React.JSX.Element` dönüş tipi belirtir.
 - Props interface'i bileşen dosyasının üstünde tanımlanır.
-- **YASAK**: Bileşen içinde inline style — Mantine `style` prop veya CSS modülleri kullanılır.
+- **YASAK**: Bileşen içinde ham inline style objesi — Mantine `style` prop'u veya `styles` prop'u kullanılır. Mantine bileşenlerine verilen `style`/`styles` prop'ları **istisnadır** ve kabul edilir.
 - **YASAK**: `document.getElementById`, `querySelector` vb. doğrudan DOM manipülasyonu.
 
 ```typescript

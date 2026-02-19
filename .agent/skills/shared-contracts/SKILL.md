@@ -213,6 +213,11 @@ const PAGE_KEYS = {
   USER_MANAGEMENT: 'user-management',
   PAGE_MANAGEMENT: 'page-management',
   SETTINGS: 'settings',
+  SETTINGS_UNITS: 'settings-units',
+  SETTINGS_CLASSIFICATIONS: 'settings-classifications',
+  SETTINGS_CHANNELS: 'settings-channels',
+  SETTINGS_FOLDERS: 'settings-folders',
+  SETTINGS_CATEGORIES: 'settings-categories',
   LOGS: 'logs',
   COURIER_DELIVERED: 'courier-delivered',
   COURIER_NOT_DELIVERED: 'courier-not-delivered'
@@ -227,8 +232,14 @@ type PageKey = (typeof PAGE_KEYS)[keyof typeof PAGE_KEYS]
 /** Projede gerçekten route/menü olarak tanımlı sayfalar */
 const MENU_PAGE_KEYS: readonly PageKey[] = [
   PAGE_KEYS.DASHBOARD,
+  PAGE_KEYS.INCOMING_DOCUMENTS,
   PAGE_KEYS.USER_MANAGEMENT,
   PAGE_KEYS.PAGE_MANAGEMENT,
+  PAGE_KEYS.SETTINGS_UNITS,
+  PAGE_KEYS.SETTINGS_CLASSIFICATIONS,
+  PAGE_KEYS.SETTINGS_CHANNELS,
+  PAGE_KEYS.SETTINGS_FOLDERS,
+  PAGE_KEYS.SETTINGS_CATEGORIES,
   PAGE_KEYS.COURIER_DELIVERED,
   PAGE_KEYS.COURIER_NOT_DELIVERED
 ] as const
@@ -238,8 +249,14 @@ const PUBLIC_PAGES: readonly PageKey[] = [PAGE_KEYS.DASHBOARD] as const
 
 /** İzin listesinde yer alan sayfalar (rol varsayılanları, atanabilir sayfalar) */
 const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
+  PAGE_KEYS.INCOMING_DOCUMENTS,
   PAGE_KEYS.USER_MANAGEMENT,
   PAGE_KEYS.PAGE_MANAGEMENT,
+  PAGE_KEYS.SETTINGS_UNITS,
+  PAGE_KEYS.SETTINGS_CLASSIFICATIONS,
+  PAGE_KEYS.SETTINGS_CHANNELS,
+  PAGE_KEYS.SETTINGS_FOLDERS,
+  PAGE_KEYS.SETTINGS_CATEGORIES,
   PAGE_KEYS.COURIER_DELIVERED,
   PAGE_KEYS.COURIER_NOT_DELIVERED
 ] as const
@@ -250,8 +267,18 @@ const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
 | Sabit                        | Açıklama                                         | Sayfalar                                     |
 | ---------------------------- | ------------------------------------------------ | -------------------------------------------- |
 | `PUBLIC_PAGES`               | Herkes erişebilir (izin kontrolü yok)            | dashboard                                    |
-| `PAGES_REQUIRING_PERMISSION` | İzin tablosu + rol varsayılanıyla kontrol edilir | user-management, page-management, courier-\* |
+| `PAGES_REQUIRING_PERMISSION` | İzin tablosu + rol varsayılanıyla kontrol edilir | incoming-documents, user-management, page-management, settings-\*, courier-\* |
 | `MENU_PAGE_KEYS`             | Menüde/route'ta aktif olan tüm sayfalar          | dashboard + izinli sayfalar                  |
+
+### DEFAULT_PAGINATION
+
+```typescript
+const DEFAULT_PAGINATION = {
+  PAGE: 1,
+  LIMIT: 20,
+  MAX_LIMIT: 100
+} as const
+```
 
 ### STATUS_CODES
 
