@@ -66,10 +66,12 @@ export class {Modul}Service extends BaseService<{Modul}> {
 
 ## 4. Güvenlik Kontrolleri
 
-- Şifreler varsa `bcryptjs` ile hashle (SALT_ROUNDS = 10)
+- Şifreler varsa `bcryptjs` ile hashle (SALT_ROUNDS = 8)
 - Yanıtlarda şifre alanı döndürme — `stripPassword()` pattern'i
 - Rol hiyerarşisi kontrolü: `system (4) > superadmin (3) > admin (2) > user (1)`
 - `system` rolü arayüzden atanamaz, seed ile oluşturulur
+- Sıralı numara üretimi atomik transaction içinde (`createWithAutoNumbers` pattern)
+- Eşzamanlı güncelleme riski varsa optimistic locking değerlendirilir
 
 ## 5. ServiceManager'a Kaydet
 

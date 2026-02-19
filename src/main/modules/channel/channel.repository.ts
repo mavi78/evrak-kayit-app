@@ -15,7 +15,7 @@ export class ChannelRepository extends BaseRepository<Channel> {
   }
 
   protected override getBooleanColumns(): readonly string[] {
-    return ['is_default', 'is_active']
+    return ['is_default', 'is_active', 'is_senet_required']
   }
 
   protected getTableSchemas(): readonly string[] {
@@ -26,6 +26,7 @@ export class ChannelRepository extends BaseRepository<Channel> {
         sort_order INTEGER NOT NULL DEFAULT 0,
         is_default INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0, 1)),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+        is_senet_required INTEGER NOT NULL DEFAULT 1 CHECK(is_senet_required IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
       )`

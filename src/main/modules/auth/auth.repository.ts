@@ -479,22 +479,11 @@ export class AuthRepository extends BaseRepository<User> {
 
   // ================================================================
   // ROL SAYFA VARSAYILANLARI (system default — role_system_defaults)
+  // Not: Eski proxy metotlar (getRolePageDefaults, setRolePageDefaults,
+  // getRoleVisibilityDefaults, setRoleVisibilityDefaults) kaldırıldı.
+  // Service katmanı doğrudan getRoleSystemDefaults, setRoleSystemDefaults,
+  // getEffectiveRolePageAccess, setRolePageAccess çağırır.
   // ================================================================
-
-  /** Belirtilen rol için system'ın verdiği açık sayfa anahtarlarını getirir (API uyumu). */
-  getRolePageDefaults(role: Exclude<UserRole, 'system'>): string[] {
-    return this.getRoleSystemDefaults(role)
-      .filter((r) => r.can_access)
-      .map((r) => r.page_key)
-  }
-
-  /** Belirtilen rol için system sayfa setini günceller — sadece system kullanıcısı. */
-  setRolePageDefaults(role: Exclude<UserRole, 'system'>, pageKeys: string[]): void {
-    this.setRoleSystemDefaults(
-      role,
-      pageKeys.map((page_key) => ({ page_key, can_access: true }))
-    )
-  }
 
   /** role_page_defaults tablosu yoksa oluşturur (migration). */
   private ensureRolePageDefaultsTable(): void {
@@ -520,23 +509,9 @@ export class AuthRepository extends BaseRepository<User> {
 
   // ================================================================
   // ROL VARSAYILAN GÖRÜNÜRLÜK (efektif: system default + override)
+  // Not: Eski proxy metotlar kaldırıldı (yukarıdaki nota bakın).
+  // Service doğrudan getEffectiveRolePageAccess / setRolePageAccess çağırır.
   // ================================================================
-
-  /** Belirtilen rol için efektif sayfa görünürlüğünü getirir (system default + role_page_access override). */
-  getRoleVisibilityDefaults(
-    role: Exclude<UserRole, 'system'>
-  ): { page_key: string; can_access: boolean }[] {
-    return this.getEffectiveRolePageAccess(role)
-  }
-
-  /** Rol sayfa erişimini günceller (üst rol alt rol için aç/kapa; role_page_access override). */
-  setRoleVisibilityDefaults(
-    targetRole: Exclude<UserRole, 'system'>,
-    defaults: { page_key: string; can_access: boolean }[],
-    grantedBy: number
-  ): void {
-    this.setRolePageAccess(targetRole, defaults, grantedBy)
-  }
 
   /** role_visibility_defaults tablosu yoksa oluşturur (migration). */
   private ensureRoleVisibilityDefaultsTable(): void {

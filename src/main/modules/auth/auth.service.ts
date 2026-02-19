@@ -35,7 +35,7 @@ import type {
 } from '@shared/types'
 import type { ServiceHandlerMap } from '@main/core/types'
 
-const SALT_ROUNDS = 10
+const SALT_ROUNDS = 8
 
 /** Başlangıç sistem kullanıcısı - tüm yetkilere sahip, asla silinemez/kaldırılamaz */
 const SEED_SYSTEM = {
@@ -471,7 +471,10 @@ export class AuthService extends BaseService<User> {
     if (role !== 'superadmin' && role !== 'admin' && role !== 'user') {
       throw AppError.badRequest('Geçersiz rol; superadmin, admin veya user olmalı')
     }
-    const fromDb = this.repository.getRolePageDefaults(role)
+    const fromDb = this.repository
+      .getRoleSystemDefaults(role)
+      .filter((r) => r.can_access)
+      .map((r) => r.page_key)
     const permissionKeysSet = new Set(PAGES_REQUIRING_PERMISSION as readonly string[])
     const pageKeys = fromDb.filter((k) => permissionKeysSet.has(k))
     return this.ok(pageKeys, 'Rol sayfa varsayılanları getirildi')
@@ -498,7 +501,10 @@ export class AuthService extends BaseService<User> {
       }
     }
     const role = data.role as 'superadmin' | 'admin' | 'user'
-    this.repository.setRolePageDefaults(role, data.page_keys)
+    this.repository.setRoleSystemDefaults(
+      role,
+      data.page_keys.map((page_key) => ({ page_key, can_access: true }))
+    )
     this.repository.addAuditLog(
       data.set_by,
       'SET_ROLE_PAGE_DEFAULTS',

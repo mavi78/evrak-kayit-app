@@ -10,6 +10,8 @@ export interface Channel extends BaseEntity {
   sort_order: number
   is_default: boolean
   is_active: boolean
+  /** Teslim işleminde senet numarası üretilsin mi? Varsayılan: true */
+  is_senet_required: boolean
 }
 
 export interface CreateChannelRequest {
@@ -17,6 +19,7 @@ export interface CreateChannelRequest {
   sort_order?: number
   is_default?: boolean
   is_active?: boolean
+  is_senet_required?: boolean
 }
 
 export interface UpdateChannelRequest {
@@ -25,4 +28,5 @@ export interface UpdateChannelRequest {
   sort_order?: number
   is_default?: boolean
   is_active?: boolean
+  is_senet_required?: boolean
 }

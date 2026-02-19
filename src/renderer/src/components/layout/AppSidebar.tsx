@@ -27,7 +27,8 @@ import {
   IconChevronRight,
   IconInfoCircle,
   IconTruck,
-  IconShield
+  IconShield,
+  IconMailbox
 } from '@tabler/icons-react'
 import { useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -52,10 +53,12 @@ const PAGE_ICONS: Record<string, React.ReactNode> = {
   'settings-channels': <IconSettings size={20} stroke={1.5} />,
   'settings-folders': <IconSettings size={20} stroke={1.5} />,
   'settings-categories': <IconSettings size={20} stroke={1.5} />,
+  'settings-app-general': <IconSettings size={20} stroke={1.5} />,
   logs: <IconFileText size={20} stroke={1.5} />,
   'courier-delivered': <IconTruck size={20} stroke={1.5} />,
   'courier-not-delivered': <IconTruck size={20} stroke={1.5} />,
-  'page-management': <IconShield size={20} stroke={1.5} />
+  'page-management': <IconShield size={20} stroke={1.5} />,
+  'postal-service': <IconMailbox size={20} stroke={1.5} />
 }
 
 interface AppSidebarProps {

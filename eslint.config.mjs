@@ -25,7 +25,22 @@ export default defineConfig(
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules
+      ...eslintPluginReactRefresh.configs.vite.rules,
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'alert',
+          message: 'alert() kullanımı yasak. useConfirmModal hook kullanın.'
+        },
+        {
+          name: 'confirm',
+          message: 'confirm() kullanımı yasak. useConfirmModal hook kullanın.'
+        },
+        {
+          name: 'prompt',
+          message: 'prompt() kullanımı yasak. Mantine bileşenleri kullanın.'
+        }
+      ]
     }
   },
   eslintConfigPrettier

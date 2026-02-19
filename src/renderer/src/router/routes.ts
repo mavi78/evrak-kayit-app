@@ -45,6 +45,11 @@ const CategoriesPage = lazy(() => import('@renderer/pages/settings/categories/Ca
 const IncomingDocumentsPage = lazy(
   () => import('@renderer/pages/incoming-documents/IncomingDocumentsPage')
 )
+const AppSettingsPage = lazy(() => import('@renderer/pages/settings/app-general/AppSettingsPage'))
+const PostalStampsPage = lazy(
+  () => import('@renderer/pages/settings/postal-stamps/PostalStampsPage')
+)
+const PostalServicePage = lazy(() => import('@renderer/pages/postal-service/PostalServicePage'))
 
 /** Router'da kullanılan yaprak route (path + component zorunlu) */
 export type LeafRouteConfig = RouteConfig & {
@@ -116,6 +121,15 @@ export const routes: RouteConfig[] = [
     requiresPermission: true,
     children: [
       {
+        path: '/settings/app-general',
+        component: AppSettingsPage,
+        pageKey: 'settings-app-general',
+        showInSidebar: true,
+        label: 'Genel Ayarlar',
+        minimumRole: 'user',
+        requiresPermission: true
+      },
+      {
         path: '/settings/units',
         component: UnitsPage,
         pageKey: 'settings-units',
@@ -159,6 +173,15 @@ export const routes: RouteConfig[] = [
         label: 'Kategori Düzenleme',
         minimumRole: 'user',
         requiresPermission: true
+      },
+      {
+        path: '/settings/postal-stamps',
+        component: PostalStampsPage,
+        pageKey: 'settings-postal-stamps',
+        showInSidebar: true,
+        label: 'Posta Pulu',
+        minimumRole: 'user',
+        requiresPermission: true
       }
     ]
   },
@@ -186,6 +209,15 @@ export const routes: RouteConfig[] = [
         requiresPermission: true
       }
     ]
+  },
+  {
+    path: '/postal-service',
+    component: PostalServicePage,
+    pageKey: 'postal-service',
+    showInSidebar: true,
+    label: 'Posta Servisi',
+    minimumRole: 'user',
+    requiresPermission: true
   }
 ]
 

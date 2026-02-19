@@ -2,42 +2,57 @@
 // IncomingDocumentService - Gelen evrak iş mantığı
 //
 // Sorumlulukları:
-// 1. Kayıt no ve gün sıra no otomatik atama
+// 1. Gün sıra no otomatik atama (K.No olarak id kullanılır)
 // 2. Tarihi'den document_type (EVRAK/MESAJ) hesaplama
 // 3. EVRAK + requires_security_number ise Güv.Kont. Nu zorunlu; MESAJ ise zorunlu değil
-// 4. Havale/dağıtım CRUD
+// 4. Dağıtım CRUD (generic: INCOMING/OUTGOING/TRANSIT)
+// 5. Teslim işlemi — atomik senet no üretimi
 // ============================================================
 
 import { BaseService } from '@main/core/BaseService'
 import { AppError } from '@main/core/AppError'
 import { IncomingDocumentRepository } from './incoming-document.repository'
-import { IncomingDocumentDistributionRepository } from './incoming-document-distribution.repository'
+import { DistributionRepository } from './incoming-document-distribution.repository'
+import { ReceiptCounterRepository } from './receipt-counter.repository'
+import { ChannelRepository } from '@main/modules/channel/channel.repository'
 import { ClassificationRepository } from '@main/modules/classification/classification.repository'
-import { parseDocumentDateInput, isSecurityControlNoRequired, toUpperCaseTr } from '@shared/utils'
+import { UnitRepository } from '@main/modules/unit/unit.repository'
+import { PostalEnvelopeRepository } from '@main/modules/postal-envelope/postal-envelope.repository'
+import { parseDocumentDateInput, isSecurityControlNoRequired } from '@shared/utils'
 import type {
   IncomingDocument,
-  IncomingDocumentDistribution,
+  DocumentDistribution,
   CreateIncomingDocumentRequest,
   UpdateIncomingDocumentRequest,
   SearchIncomingDocumentsRequest,
   PaginatedIncomingDocumentsResponse,
   NextRecordInfoResponse,
-  CreateIncomingDocumentDistributionRequest,
-  UpdateIncomingDocumentDistributionRequest,
-  ServiceResponse
+  CreateDistributionRequest,
+  UpdateDistributionRequest,
+  DeliverDistributionRequest,
+  ServiceResponse,
+  DocumentScope
 } from '@shared/types'
 import type { ServiceHandlerMap } from '@main/core/types'
 
 export class IncomingDocumentService extends BaseService<IncomingDocument> {
   protected repository: IncomingDocumentRepository
-  private distributionRepository: IncomingDocumentDistributionRepository
+  private distributionRepository: DistributionRepository
+  private receiptCounterRepository: ReceiptCounterRepository
   private classificationRepository: ClassificationRepository
+  private channelRepository: ChannelRepository
+  private unitRepository: UnitRepository
+  private postalEnvelopeRepository: PostalEnvelopeRepository
 
   constructor() {
     super()
     this.repository = new IncomingDocumentRepository()
-    this.distributionRepository = new IncomingDocumentDistributionRepository()
+    this.distributionRepository = new DistributionRepository()
+    this.receiptCounterRepository = new ReceiptCounterRepository()
     this.classificationRepository = new ClassificationRepository()
+    this.channelRepository = new ChannelRepository()
+    this.unitRepository = new UnitRepository()
+    this.postalEnvelopeRepository = new PostalEnvelopeRepository()
   }
 
   getModuleName(): string {
@@ -72,27 +87,20 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
       }
     }
 
-    const recordNo = this.repository.getNextRecordNo()
     const now = new Date()
-    // Bugünün tarihi (YYYY-MM-DD formatında) - created_at ile aynı olacak
     const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    const daySequenceNo = this.repository.getNextDaySequenceNo(todayDate)
 
-    const item = this.repository.create({
-      record_no: recordNo,
-      // record_date geçici olarak bugünün tarihi (migration ile kaldırılacak, frontend created_at kullanır)
-      record_date: todayDate,
-      day_sequence_no: daySequenceNo,
+    // Atomik oluşturma: day_sequence_no ve INSERT tek transaction'da
+    const item = this.repository.createWithAutoNumbers(todayDate, {
       channel_id,
-      source_office: toUpperCaseTr((input.source_office ?? '').trim()),
-      reference_number: toUpperCaseTr((input.reference_number ?? '').trim()),
-      subject: toUpperCaseTr((input.subject ?? '').trim()),
-      document_date: toUpperCaseTr(documentDate),
+      source_office: (input.source_office ?? '').trim(),
+      reference_number: (input.reference_number ?? '').trim(),
+      subject: (input.subject ?? '').trim(),
+      document_date: documentDate,
       document_type: documentType,
       attachment_count: input.attachment_count ?? 0,
       classification_id,
-      security_control_no:
-        documentType === 'MESAJ' ? '' : toUpperCaseTr((input.security_control_no ?? '').trim()),
+      security_control_no: documentType === 'MESAJ' ? '' : (input.security_control_no ?? '').trim(),
       page_count: input.page_count ?? 0,
       category_id,
       folder_id
@@ -133,12 +141,11 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
 
     const fields: Record<string, unknown> = {}
     if (input.channel_id !== undefined) fields.channel_id = input.channel_id
-    if (input.source_office !== undefined)
-      fields.source_office = toUpperCaseTr(input.source_office.trim())
+    if (input.source_office !== undefined) fields.source_office = input.source_office.trim()
     if (input.reference_number !== undefined)
-      fields.reference_number = toUpperCaseTr(input.reference_number.trim())
-    if (input.subject !== undefined) fields.subject = toUpperCaseTr(input.subject.trim())
-    fields.document_date = toUpperCaseTr(documentDate)
+      fields.reference_number = input.reference_number.trim()
+    if (input.subject !== undefined) fields.subject = input.subject.trim()
+    fields.document_date = documentDate
     fields.document_type = documentType
     if (input.attachment_count !== undefined) fields.attachment_count = input.attachment_count
     if (input.classification_id !== undefined) fields.classification_id = input.classification_id
@@ -146,7 +153,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
       fields.security_control_no = ''
     } else if (input.security_control_no !== undefined) {
       fields.security_control_no =
-        input.security_control_no === null ? '' : toUpperCaseTr(input.security_control_no.trim())
+        input.security_control_no === null ? '' : input.security_control_no.trim()
     }
     if (input.page_count !== undefined) fields.page_count = input.page_count
     if (input.category_id !== undefined) fields.category_id = input.category_id
@@ -162,16 +169,18 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
       'incoming-document:next-record-info': () => this.handleNextRecordInfo(),
       'incoming-document:get-distributions': (data) => this.handleGetDistributions(data),
       'incoming-document:add-distribution': (data) =>
-        this.handleAddDistribution(data as CreateIncomingDocumentDistributionRequest),
+        this.handleAddDistribution(data as CreateDistributionRequest),
       'incoming-document:update-distribution': (data) =>
-        this.handleUpdateDistribution(data as UpdateIncomingDocumentDistributionRequest),
-      'incoming-document:delete-distribution': (data) => this.handleDeleteDistribution(data)
+        this.handleUpdateDistribution(data as UpdateDistributionRequest),
+      'incoming-document:delete-distribution': (data) => this.handleDeleteDistribution(data),
+      'incoming-document:deliver-distribution': (data) =>
+        this.handleDeliverDistribution(data as DeliverDistributionRequest)
     }
   }
 
-  /** Modal açılınca: sıradaki K.No, bugünün tarihi, G.S.No */
+  /** Modal açılınca: sıradaki K.No (id), bugünün tarihi, G.S.No */
   private async handleNextRecordInfo(): Promise<ServiceResponse<NextRecordInfoResponse>> {
-    const recordNo = this.repository.getNextRecordNo()
+    const nextId = this.repository.getNextId()
     const now = new Date()
     const day = String(now.getDate()).padStart(2, '0')
     const month = String(now.getMonth() + 1).padStart(2, '0')
@@ -179,7 +188,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     const recordDate = `${day}.${month}.${year}`
     const isoDate = `${year}-${month}-${day}`
     const daySequenceNo = this.repository.getNextDaySequenceNo(isoDate)
-    return this.ok({ recordNo, recordDate, daySequenceNo }, 'Kayıt bilgileri hazır')
+    return this.ok({ nextId, recordDate, daySequenceNo }, 'Kayıt bilgileri hazır')
   }
 
   private async handleList(
@@ -189,7 +198,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     const pageSize = Math.max(20, Math.min(500, filters.pageSize ?? 20))
     const { data, total } = this.repository.searchByQueryPaginated(
       {
-        recordNo: filters.recordNo,
+        id: filters.id,
         query: filters.query?.trim() || undefined
       },
       page,
@@ -201,55 +210,185 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     )
   }
 
+  // ---- Dağıtım İşlemleri ----
+
   private async handleGetDistributions(
     data: unknown
-  ): Promise<ServiceResponse<IncomingDocumentDistribution[]>> {
-    const { incoming_document_id } = data as { incoming_document_id: number }
-    if (!incoming_document_id) throw AppError.badRequest('Evrak ID belirtilmedi')
-    const list = this.distributionRepository.findByIncomingDocumentId(incoming_document_id)
+  ): Promise<ServiceResponse<DocumentDistribution[]>> {
+    const { document_id, document_scope } = data as {
+      document_id: number
+      document_scope: DocumentScope
+    }
+    if (!document_id) throw AppError.badRequest('Evrak ID belirtilmedi')
+    if (!document_scope) throw AppError.badRequest('Evrak kapsamı belirtilmedi')
+    const list = this.distributionRepository.findByDocumentAndScope(document_id, document_scope)
     return this.ok(list, 'Dağıtımlar getirildi')
   }
 
   private async handleAddDistribution(
-    data: CreateIncomingDocumentDistributionRequest
-  ): Promise<ServiceResponse<IncomingDocumentDistribution>> {
-    const { incoming_document_id, unit_id } = data
-    if (!incoming_document_id) throw AppError.badRequest('Evrak ID belirtilmedi')
+    data: CreateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution>> {
+    const { document_id, document_scope, unit_id, channel_id } = data
+    if (!document_id) throw AppError.badRequest('Evrak ID belirtilmedi')
+    if (!document_scope) throw AppError.badRequest('Evrak kapsamı belirtilmedi')
     if (!unit_id) throw AppError.badRequest('Birlik seçimi zorunludur')
-    if (!this.repository.exists(incoming_document_id)) {
-      throw AppError.notFound('Gelen evrak kaydı bulunamadı')
+    if (!channel_id) throw AppError.badRequest('Kanal seçimi zorunludur')
+
+    // Scope'a göre evrak varlık kontrolü (şimdilik sadece INCOMING)
+    if (document_scope === 'INCOMING') {
+      if (!this.repository.exists(document_id)) {
+        throw AppError.notFound('Gelen evrak kaydı bulunamadı')
+      }
     }
+
+    // Birliğin üst birliğini otomatik bul
+    const unit = this.unitRepository.findById(unit_id)
+    if (!unit) throw AppError.badRequest('Seçilen birlik bulunamadı')
+    const parentUnitId = unit.parent_id
+
     const item = this.distributionRepository.create({
-      incoming_document_id,
+      document_id,
+      document_scope,
       unit_id,
-      distribution_type: toUpperCaseTr((data.distribution_type ?? '').trim()),
-      delivery_date: toUpperCaseTr((data.delivery_date ?? '').trim()),
-      receipt_no: toUpperCaseTr((data.receipt_no ?? '').trim())
+      parent_unit_id: parentUnitId,
+      channel_id,
+      is_delivered: false,
+      delivery_date: null,
+      receipt_no: null
     })
-    return this.created(item, 'Havale/dağıtım eklendi')
+
+    // Kanal senet gerektirmiyorsa otomatik teslim et (Posta kanalı hariç — posta servisi modülünde teslim edilecek)
+    const channel = this.channelRepository.findById(channel_id)
+    if (channel && !channel.is_senet_required && channel.name.toLowerCase() !== 'posta') {
+      const delivered = this.distributionRepository.markDeliveredWithoutReceipt(item.id)
+      return this.created(
+        delivered ?? item,
+        'Dağıtım eklendi ve teslim edildi (senet gerektirmiyor)'
+      )
+    }
+
+    return this.created(item, 'Dağıtım eklendi')
   }
 
   private async handleUpdateDistribution(
-    data: UpdateIncomingDocumentDistributionRequest
-  ): Promise<ServiceResponse<IncomingDocumentDistribution | null>> {
+    data: UpdateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> {
     const { id, ...rest } = data
     if (!id) throw AppError.badRequest('Güncellenecek dağıtım ID belirtilmedi')
-    if (!this.distributionRepository.exists(id)) throw AppError.notFound('Dağıtım kaydı bulunamadı')
+    const existing = this.distributionRepository.findById(id)
+    if (!existing) throw AppError.notFound('Dağıtım kaydı bulunamadı')
+
+    // Kanal değişikliği kontrolü — Kurye ve Posta ile teslim edilmişse değiştirilemez
+    if (existing.is_delivered && rest.channel_id !== undefined) {
+      const currentChannel = this.channelRepository.findById(existing.channel_id)
+      const lockedChannels = ['posta', 'kurye']
+      if (currentChannel && lockedChannels.includes(currentChannel.name.toLowerCase())) {
+        throw AppError.badRequest(
+          `${currentChannel.name} ile teslim edilmiş dağıtımın kanalı değiştirilemez`
+        )
+      }
+    }
+
     const fields: Record<string, unknown> = {}
-    if (rest.unit_id !== undefined) fields.unit_id = rest.unit_id
-    if (rest.distribution_type !== undefined)
-      fields.distribution_type = toUpperCaseTr(rest.distribution_type.trim())
-    if (rest.delivery_date !== undefined)
-      fields.delivery_date = toUpperCaseTr(rest.delivery_date.trim())
-    if (rest.receipt_no !== undefined) fields.receipt_no = toUpperCaseTr(rest.receipt_no.trim())
+
+    if (rest.unit_id !== undefined) {
+      // Birlik değiştiğinde parent_unit_id'yi de güncelle
+      const unit = this.unitRepository.findById(rest.unit_id)
+      if (!unit) throw AppError.badRequest('Seçilen birlik bulunamadı')
+      fields.unit_id = rest.unit_id
+      fields.parent_unit_id = unit.parent_id
+    }
+
+    // Eski kanalın Posta olup olmadığını kontrol et — kanal değişirse zarftan kopar
+    if (rest.channel_id !== undefined && rest.channel_id !== existing.channel_id) {
+      const oldChannel = this.channelRepository.findById(existing.channel_id)
+      if (oldChannel && oldChannel.name.toLowerCase() === 'posta') {
+        // Posta zarfına bağlıysa bağlantıyı kaldır
+        this.postalEnvelopeRepository.unlinkDistribution(id)
+      }
+
+      fields.channel_id = rest.channel_id
+
+      // Teslim edilmiş bir dağıtımın kanalı değiştiriliyorsa teslim durumunu sıfırla
+      if (existing.is_delivered) {
+        fields.is_delivered = false
+        fields.delivery_date = null
+        fields.receipt_no = null
+      }
+    }
+
     const item = this.distributionRepository.update(id, fields)
+
+    // Kanal değiştirildiğinde, yeni kanal senet gerektirmiyorsa otomatik teslim et (Posta kanalı hariç)
+    if (rest.channel_id !== undefined) {
+      const newChannel = this.channelRepository.findById(rest.channel_id)
+      if (
+        newChannel &&
+        !newChannel.is_senet_required &&
+        newChannel.name.toLowerCase() !== 'posta'
+      ) {
+        const delivered = this.distributionRepository.markDeliveredWithoutReceipt(id)
+        return this.ok(delivered, 'Dağıtım güncellendi ve teslim edildi (senet gerektirmiyor)')
+      }
+    }
+
     return this.ok(item, 'Dağıtım güncellendi')
   }
 
   private async handleDeleteDistribution(data: unknown): Promise<ServiceResponse<boolean>> {
-    const { id } = this.requireId(data)
-    if (!this.distributionRepository.exists(id)) throw AppError.notFound('Dağıtım kaydı bulunamadı')
+    const input = data as { id: number; force_postal_delete?: boolean }
+    const id = input.id
+    if (!id) throw AppError.badRequest('Silinecek dağıtım ID belirtilmedi')
+
+    const existing = this.distributionRepository.findById(id)
+    if (!existing) throw AppError.notFound('Dağıtım kaydı bulunamadı')
+
+    // Posta zarfına bağlı mı kontrol et
+    const isLinkedToEnvelope = this.postalEnvelopeRepository.isDistributionLinkedToEnvelope(id)
+
+    if (isLinkedToEnvelope && !input.force_postal_delete) {
+      // Frontend'e uyarı gönder — kullanıcı onayı gerekiyor
+      return {
+        success: false,
+        statusCode: 409,
+        message: 'POSTAL_ENVELOPE_WARNING',
+        data: false
+      }
+    }
+
+    // Posta zarfı bağlantısını temizle (varsa)
+    if (isLinkedToEnvelope) {
+      this.postalEnvelopeRepository.unlinkDistribution(id)
+    }
+
+    // Dağıtımı sil
     this.distributionRepository.delete(id)
     return this.ok(true, 'Dağıtım silindi')
+  }
+
+  /** Teslim işlemi — kanalın is_senet_required değerine göre senet no üretimi */
+  private async handleDeliverDistribution(
+    data: DeliverDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> {
+    const { id } = data
+    if (!id) throw AppError.badRequest('Teslim edilecek dağıtım ID belirtilmedi')
+    const existing = this.distributionRepository.findById(id)
+    if (!existing) throw AppError.notFound('Dağıtım kaydı bulunamadı')
+    if (existing.is_delivered) throw AppError.badRequest('Bu dağıtım zaten teslim edilmiş')
+
+    // Kanalın senet gerekliliğini kontrol et
+    const channel = this.channelRepository.findById(existing.channel_id)
+    const isSenetRequired = channel?.is_senet_required ?? true
+
+    if (isSenetRequired) {
+      // Atomik senet no üret (exclusive transaction)
+      const receiptNo = this.receiptCounterRepository.getNextReceiptNo()
+      const item = this.distributionRepository.markDelivered(id, receiptNo)
+      return this.ok(item, `Teslim edildi — Senet No: ${receiptNo}`)
+    } else {
+      // Senet gerektirmeyen kanal — senet no olmadan teslim et
+      const item = this.distributionRepository.markDeliveredWithoutReceipt(id)
+      return this.ok(item, 'Teslim edildi (senet no gerektirmiyor)')
+    }
   }
 }

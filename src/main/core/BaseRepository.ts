@@ -134,21 +134,17 @@ export abstract class BaseRepository<T extends BaseEntity> {
   protected toDbModel(data: Record<string, unknown>): Record<string, unknown> {
     const result = { ...data }
     const excludedCols = this.getExcludedTextColumns()
-    
+
     // Boolean dönüşümü
     for (const col of this.getBooleanColumns()) {
       if (col in result && typeof result[col] === 'boolean') {
         result[col] = result[col] ? 1 : 0
       }
     }
-    
+
     // Text alanlarını normalize et ve büyük harfe çevir (hariç tutulanlar dışında)
     for (const key in result) {
-      if (
-        typeof result[key] === 'string' &&
-        result[key] !== null &&
-        !excludedCols.includes(key)
-      ) {
+      if (typeof result[key] === 'string' && result[key] !== null && !excludedCols.includes(key)) {
         const value = result[key] as string
         // Önce normalize et (boşlukları temizle)
         const normalized = this.normalizeText(value)
@@ -160,7 +156,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
         }
       }
     }
-    
+
     return result
   }
 
@@ -168,28 +164,72 @@ export abstract class BaseRepository<T extends BaseEntity> {
   // GÜVENLİ ÇALIŞTIRMA - DB hataları otomatik AppError'a çevrilir
   // ================================================================
 
+  /** SQLITE_BUSY retry sabitleri */
+  private readonly MAX_BUSY_RETRIES = 3
+  private readonly BUSY_RETRY_BASE_MS = 200
+
+  /** Hata mesajının SQLITE_BUSY olup olmadığını kontrol eder */
+  private isBusyError(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error)
+    return msg.includes('SQLITE_BUSY') || msg.includes('database is locked')
+  }
+
+  /** Senkron bekleme — better-sqlite3 senkron olduğu için gerekli */
+  private busyWait(ms: number): void {
+    const end = Date.now() + ms
+    while (Date.now() < end) {
+      /* sync busy wait */
+    }
+  }
+
   /**
    * Tek DB işlemini güvenli çalıştırır.
    * SQLite hataları (UNIQUE, FK, BUSY vb.) anlamlı AppError'a çevrilir.
+   * SQLITE_BUSY hatası alınırsa otomatik retry yapılır (max 3 deneme).
    */
   protected safeExecute<R>(fn: () => R): R {
-    try {
-      return fn()
-    } catch (error: unknown) {
-      throw this.translateDbError(error)
+    for (let attempt = 0; attempt <= this.MAX_BUSY_RETRIES; attempt++) {
+      try {
+        return fn()
+      } catch (error: unknown) {
+        if (this.isBusyError(error) && attempt < this.MAX_BUSY_RETRIES) {
+          const waitMs = this.BUSY_RETRY_BASE_MS * (attempt + 1)
+          this.logger.warn(
+            `SQLITE_BUSY, retry ${attempt + 1}/${this.MAX_BUSY_RETRIES} (${waitMs}ms bekle)`,
+            this.getTableName()
+          )
+          this.busyWait(waitMs)
+          continue
+        }
+        throw this.translateDbError(error)
+      }
     }
+    throw AppError.busy('Veritabanı meşgul, lütfen tekrar deneyin')
   }
 
   /**
    * Transaction içinde güvenli çalıştırır.
    * Hata olursa otomatik rollback yapılır.
+   * SQLITE_BUSY hatası alınırsa otomatik retry yapılır (max 3 deneme).
    */
   protected safeTransaction<R>(fn: () => R): R {
-    try {
-      return this.db.transaction(fn)()
-    } catch (error: unknown) {
-      throw this.translateDbError(error)
+    for (let attempt = 0; attempt <= this.MAX_BUSY_RETRIES; attempt++) {
+      try {
+        return this.db.transaction(fn)()
+      } catch (error: unknown) {
+        if (this.isBusyError(error) && attempt < this.MAX_BUSY_RETRIES) {
+          const waitMs = this.BUSY_RETRY_BASE_MS * (attempt + 1)
+          this.logger.warn(
+            `SQLITE_BUSY (tx), retry ${attempt + 1}/${this.MAX_BUSY_RETRIES} (${waitMs}ms bekle)`,
+            this.getTableName()
+          )
+          this.busyWait(waitMs)
+          continue
+        }
+        throw this.translateDbError(error)
+      }
     }
+    throw AppError.busy('Veritabanı meşgul, lütfen tekrar deneyin')
   }
 
   /**
@@ -298,11 +338,30 @@ export abstract class BaseRepository<T extends BaseEntity> {
     })
   }
 
-  /** Kaydı günceller. Boolean alanlar otomatik 0/1'e çevrilir. updated_at otomatik eklenir. */
+  /**
+   * Kaydı günceller. Boolean alanlar otomatik 0/1'e çevrilir. updated_at otomatik eklenir.
+   * Optimistic locking: Eğer data içinde _expected_updated_at varsa, mevcut kaydın
+   * updated_at değeri ile karşılaştırılır. Eşleşmezse çakışma hatası fırlatılır.
+   * _expected_updated_at gönderilmezse eski davranış korunur.
+   */
   update(id: number, data: Record<string, unknown>): T | null {
     return this.safeExecute(() => {
+      // Optimistic locking kontrolü (opsiyonel)
+      const expectedUpdatedAt = data._expected_updated_at as string | undefined
+      if (expectedUpdatedAt !== undefined) {
+        const current = this.findById(id)
+        if (current && (current as Record<string, unknown>).updated_at !== expectedUpdatedAt) {
+          throw AppError.conflict(
+            'Bu kayıt başka bir kullanıcı tarafından güncellenmiş. Lütfen sayfayı yenileyip tekrar deneyin.'
+          )
+        }
+      }
+      // _expected_updated_at DB'ye yazılmamalı
+      const cleanData = { ...data }
+      delete cleanData._expected_updated_at
+
       const now = formatForDatabase()
-      const dbData = this.toDbModel({ ...data, updated_at: now })
+      const dbData = this.toDbModel({ ...cleanData, updated_at: now })
       const keys = Object.keys(dbData)
       const values = Object.values(dbData)
       const setClause = keys.map((key) => `${key} = ?`).join(', ')
