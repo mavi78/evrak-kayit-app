@@ -1,18 +1,7 @@
 // ============================================================
-// searchUtils - Metin normalizasyonu (arama + veritabanı kayıt)
+// searchUtils - Metin normalizasyonu (arama)
 // Büyük/küçük harf duyarsız + Türkçe karakter desteği
 // ============================================================
-
-/**
- * Veritabanına kaydedilecek metni Türkçe kurallarına göre büyük harfe çevirir.
- * i→İ, ı→I (Türkçe alfabe kuralları).
- * @param str - Dönüştürülecek metin
- * @returns Büyük harfli metin
- */
-export function toUpperCaseTr(str: string): string {
-  if (typeof str !== 'string') return ''
-  return str.toLocaleUpperCase('tr-TR')
-}
 
 /**
  * Arama terimini normalize eder: küçük harfe çevirir ve Türkçe karakterleri

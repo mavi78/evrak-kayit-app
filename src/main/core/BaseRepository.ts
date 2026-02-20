@@ -165,8 +165,11 @@ export abstract class BaseRepository<T extends BaseEntity> {
   // ================================================================
 
   /** SQLITE_BUSY retry sabitleri */
-  private readonly MAX_BUSY_RETRIES = 3
-  private readonly BUSY_RETRY_BASE_MS = 200
+  private readonly MAX_BUSY_RETRIES = 5
+  private readonly BUSY_RETRY_BASE_MS = 500
+
+  /** Atomics.wait için paylaşımlı tampon — CPU israfı olmadan senkron bekleme sağlar */
+  private static readonly waitBuffer = new Int32Array(new SharedArrayBuffer(4))
 
   /** Hata mesajının SQLITE_BUSY olup olmadığını kontrol eder */
   private isBusyError(error: unknown): boolean {
@@ -174,18 +177,21 @@ export abstract class BaseRepository<T extends BaseEntity> {
     return msg.includes('SQLITE_BUSY') || msg.includes('database is locked')
   }
 
-  /** Senkron bekleme — better-sqlite3 senkron olduğu için gerekli */
+  /**
+   * CPU israfı olmadan senkron bekleme.
+   * Atomics.wait: Thread'i bloklamadan belirtilen süre kadar bekletir.
+   * Random jitter (±%25): Birden fazla proses aynı anda retry'a düştüğünde
+   * hepsinin aynı anda tekrar denemesini önler (thundering herd koruması).
+   */
   private busyWait(ms: number): void {
-    const end = Date.now() + ms
-    while (Date.now() < end) {
-      /* sync busy wait */
-    }
+    const jitter = ms * (0.75 + Math.random() * 0.5)
+    Atomics.wait(BaseRepository.waitBuffer, 0, 0, Math.round(jitter))
   }
 
   /**
    * Tek DB işlemini güvenli çalıştırır.
    * SQLite hataları (UNIQUE, FK, BUSY vb.) anlamlı AppError'a çevrilir.
-   * SQLITE_BUSY hatası alınırsa otomatik retry yapılır (max 3 deneme).
+   * SQLITE_BUSY hatası alınırsa otomatik retry yapılır (max 5 deneme, artan bekleme + jitter).
    */
   protected safeExecute<R>(fn: () => R): R {
     for (let attempt = 0; attempt <= this.MAX_BUSY_RETRIES; attempt++) {
@@ -195,7 +201,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
         if (this.isBusyError(error) && attempt < this.MAX_BUSY_RETRIES) {
           const waitMs = this.BUSY_RETRY_BASE_MS * (attempt + 1)
           this.logger.warn(
-            `SQLITE_BUSY, retry ${attempt + 1}/${this.MAX_BUSY_RETRIES} (${waitMs}ms bekle)`,
+            `SQLITE_BUSY, retry ${attempt + 1}/${this.MAX_BUSY_RETRIES} (~${waitMs}ms bekle)`,
             this.getTableName()
           )
           this.busyWait(waitMs)
@@ -210,7 +216,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
   /**
    * Transaction içinde güvenli çalıştırır.
    * Hata olursa otomatik rollback yapılır.
-   * SQLITE_BUSY hatası alınırsa otomatik retry yapılır (max 3 deneme).
+   * SQLITE_BUSY hatası alınırsa otomatik retry yapılır (max 5 deneme, artan bekleme + jitter).
    */
   protected safeTransaction<R>(fn: () => R): R {
     for (let attempt = 0; attempt <= this.MAX_BUSY_RETRIES; attempt++) {
@@ -220,7 +226,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
         if (this.isBusyError(error) && attempt < this.MAX_BUSY_RETRIES) {
           const waitMs = this.BUSY_RETRY_BASE_MS * (attempt + 1)
           this.logger.warn(
-            `SQLITE_BUSY (tx), retry ${attempt + 1}/${this.MAX_BUSY_RETRIES} (${waitMs}ms bekle)`,
+            `SQLITE_BUSY (tx), retry ${attempt + 1}/${this.MAX_BUSY_RETRIES} (~${waitMs}ms bekle)`,
             this.getTableName()
           )
           this.busyWait(waitMs)

@@ -76,16 +76,6 @@ export function formatForLogFileName(date?: Date): string {
 }
 
 /**
- * Log satırı için yyyy-MM-dd HH:mm:ss formatında formatlar.
- * formatForDatabase ile aynı çıktıyı üretir (sayısal format, locale etkisiz).
- * @param date - Date nesnesi (opsiyonel, varsayılan: şimdi)
- * @returns yyyy-MM-dd HH:mm:ss formatında tarih
- */
-export function formatForLogLine(date?: Date): string {
-  return formatForDatabase(date)
-}
-
-/**
  * ISO string'i (YYYY-MM-DD veya YYYY-MM-DD HH:mm:ss) DD.MM.YYYY formatına çevirir
  * @param isoString - ISO formatında tarih string'i
  * @returns DD.MM.YYYY formatında tarih veya '—'

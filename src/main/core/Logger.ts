@@ -8,7 +8,7 @@ import { app } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, mkdirSync, appendFileSync } from 'fs'
 import { is } from '@electron-toolkit/utils'
-import { formatForLogFileName, formatForLogLine } from '@shared/utils'
+import { formatForLogFileName, formatForDatabase } from '@shared/utils'
 
 type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'
 
@@ -50,7 +50,7 @@ export class Logger {
 
   /** Log satırını formatlar ve dosyaya yazar */
   private writeLog(level: LogLevel, message: string, context?: string, error?: Error): void {
-    const timestamp = formatForLogLine()
+    const timestamp = formatForDatabase()
     const contextStr = context ? `[${context}]` : ''
     const logLine = `[${timestamp}] [${level}] ${contextStr} ${message}`
     const errorLine = error?.stack ? `\n  Stack: ${error.stack}` : ''
