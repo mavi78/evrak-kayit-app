@@ -32,6 +32,7 @@ import {
 } from '@tabler/icons-react'
 import { appSettingsApi } from '@renderer/lib/api'
 import type { Unit } from '@shared/types'
+import { normalizeForSearch } from '@shared/utils/searchUtils'
 
 // ---- Tree yardımcıları ----
 
@@ -109,10 +110,10 @@ function getSubtree(units: Unit[], rootId: number): Unit[] {
 
 /** Düz arama */
 function searchFlat(units: Unit[], query: string): Unit[] {
-  const lw = query.toLowerCase().trim()
+  const lw = normalizeForSearch(query.trim())
   if (!lw) return []
   return units.filter(
-    (u) => u.name.toLowerCase().includes(lw) || u.short_name.toLowerCase().includes(lw)
+    (u) => normalizeForSearch(u.name).includes(lw) || normalizeForSearch(u.short_name).includes(lw)
   )
 }
 
@@ -341,12 +342,15 @@ export interface UnitTreePickerProps {
   units: Unit[]
   values: number[] // Multi-select
   onChange: (unitIds: number[]) => void
+  /** Tekli seçim modu — seçim yapılınca popup kapanır, yalnızca 1 birlik seçilebilir */
+  singleSelect?: boolean
 }
 
 export function UnitTreePicker({
   units,
   values,
-  onChange
+  onChange,
+  singleSelect = false
 }: UnitTreePickerProps): React.JSX.Element {
   const theme = useMantineTheme()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -405,24 +409,34 @@ export function UnitTreePicker({
     }
   }, [])
 
-  // Seçim (Toggle logic)
+  // Seçim (Toggle logic — singleSelect modda replace + kapat)
   const handleSelect = useCallback(
     (unit: Unit) => {
-      const newSet = new Set(values)
-      if (newSet.has(unit.id)) {
-        newSet.delete(unit.id)
-      } else {
-        newSet.add(unit.id)
-      }
-      onChange(Array.from(newSet))
-
-      // Arama modundaysa inputu temizle
-      if (showSearch) {
+      if (singleSelect) {
+        // Tekli seçim: aynı birlik seçildiyse kaldır, farklıysa değiştir
+        const isSame = values.length === 1 && values[0] === unit.id
+        onChange(isSame ? [] : [unit.id])
+        // Popup / aramayı kapat
         setSearchText('')
         setShowSearch(false)
+        setShowTree(false)
+      } else {
+        // Çoklu seçim: toggle
+        const newSet = new Set(values)
+        if (newSet.has(unit.id)) {
+          newSet.delete(unit.id)
+        } else {
+          newSet.add(unit.id)
+        }
+        onChange(Array.from(newSet))
+
+        if (showSearch) {
+          setSearchText('')
+          setShowSearch(false)
+        }
       }
     },
-    [values, onChange, showSearch]
+    [values, onChange, showSearch, singleSelect]
   )
 
   // Tree toggle expand
@@ -482,7 +496,9 @@ export function UnitTreePicker({
           onChange={(e) => handleInputChange(e.currentTarget.value)}
           placeholder={
             values.length > 0
-              ? `${values.length} birlik seçildi (Aramak için yazın...)`
+              ? singleSelect
+                ? `${units.find((u) => u.id === values[0])?.name ?? 'Seçili'} (Değiştirmek için yazın...)`
+                : `${values.length} birlik seçildi (Aramak için yazın...)`
               : 'Birlik arayın...'
           }
           size="sm"

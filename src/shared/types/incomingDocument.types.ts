@@ -137,3 +137,58 @@ export interface UpdateDistributionRequest {
 export interface DeliverDistributionRequest {
   id: number
 }
+
+// ---- Kurye Teslim Tipleri ----
+
+/** Teslim edilmemiş kurye dağıtımı — evrak detaylarıyla birlikte */
+export interface CourierPendingDistribution {
+  distribution_id: number
+  document_id: number
+  document_scope: DocumentScope
+  unit_id: number
+  parent_unit_id: number | null
+  channel_id: number
+  // Evrak detayları (JOIN)
+  record_date: string
+  day_sequence_no: number
+  source_office: string
+  reference_number: string
+  subject: string
+  document_date: string
+  document_type: DocumentType
+  classification_id: number
+  security_control_no: string
+  attachment_count: number
+  page_count: number
+}
+
+/** Toplu teslim isteği */
+export interface BulkDeliverRequest {
+  distribution_ids: number[]
+}
+
+/** Teslim edilen dağıtım bilgisi — senet yazdırma için */
+export interface DeliveredReceiptInfo {
+  distribution_id: number
+  receipt_no: number | null
+  delivery_date: string
+  document_id: number
+  /** Belgenin kayıt tarihi (YYYY-MM-DD) */
+  record_date: string
+  source_office: string
+  reference_number: string
+  subject: string
+  document_date: string
+  document_type: DocumentType
+  classification_id: number
+  security_control_no: string
+  unit_name: string
+  attachment_count: number
+  page_count: number
+}
+
+/** Toplu teslim sonucu */
+export interface BulkDeliverResponse {
+  delivered: DeliveredReceiptInfo[]
+  failed: Array<{ distribution_id: number; reason: string }>
+}

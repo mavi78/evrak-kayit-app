@@ -44,6 +44,10 @@ import type {
   CreateDistributionRequest,
   UpdateDistributionRequest,
   DeliverDistributionRequest,
+  CourierPendingDistribution,
+  BulkDeliverRequest,
+  BulkDeliverResponse,
+  DeliveredReceiptInfo,
   DocumentScope,
   AppSetting,
   AppSettingKey,
@@ -278,7 +282,19 @@ export const incomingDocumentApi = {
   deliverDistribution: (
     data: DeliverDistributionRequest
   ): Promise<ServiceResponse<DocumentDistribution | null>> =>
-    invoke<DocumentDistribution | null>('incoming-document:deliver-distribution', data)
+    invoke<DocumentDistribution | null>('incoming-document:deliver-distribution', data),
+
+  // Kurye İşlemleri
+  courierPending: (unitIds: number[]): Promise<ServiceResponse<CourierPendingDistribution[]>> =>
+    invoke<CourierPendingDistribution[]>('incoming-document:courier-pending', {
+      unit_ids: unitIds
+    }),
+
+  courierBulkDeliver: (data: BulkDeliverRequest): Promise<ServiceResponse<BulkDeliverResponse>> =>
+    invoke<BulkDeliverResponse>('incoming-document:courier-bulk-deliver', data),
+
+  courierDeliveredList: (): Promise<ServiceResponse<DeliveredReceiptInfo[]>> =>
+    invoke<DeliveredReceiptInfo[]>('incoming-document:courier-delivered-list')
 }
 
 // ============================================================

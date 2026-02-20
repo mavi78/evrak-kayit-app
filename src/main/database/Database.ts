@@ -77,7 +77,7 @@ export class Database {
       (text: string | null | undefined) => {
         if (text == null || typeof text !== 'string') return ''
         return text
-          .toLowerCase()
+          .toLocaleLowerCase('tr-TR')
           .replace(/ğ/g, 'g')
           .replace(/ü/g, 'u')
           .replace(/ş/g, 's')

@@ -12,7 +12,7 @@
 export function normalizeForSearch(str: string): string {
   if (typeof str !== 'string') return ''
   return str
-    .toLowerCase()
+    .toLocaleLowerCase('tr-TR')
     .replace(/ğ/g, 'g')
     .replace(/ü/g, 'u')
     .replace(/ş/g, 's')

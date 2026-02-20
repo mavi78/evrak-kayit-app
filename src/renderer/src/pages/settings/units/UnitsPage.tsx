@@ -44,6 +44,7 @@ import { unitApi } from '@renderer/lib/api'
 import { handleApiResponse, showError } from '@renderer/lib/notifications'
 import { useDragDrop, calculateDropTarget, type DropTarget } from '@renderer/hooks/useDragDrop'
 import type { Unit, CreateUnitRequest, UpdateUnitRequest } from '@shared/types'
+import { normalizeForSearch } from '@shared/utils/searchUtils'
 
 interface TreeNode extends Unit {
   children: TreeNode[]
@@ -94,13 +95,13 @@ function flattenTree(nodes: TreeNode[], expanded: Set<number>): TreeNode[] {
 
 function searchTree(nodes: TreeNode[], query: string): TreeNode[] {
   if (!query.trim()) return nodes
-  const lowerQuery = query.toLowerCase()
+  const normalizedQuery = normalizeForSearch(query)
   const results: TreeNode[] = []
 
   function matches(node: TreeNode): boolean {
     return (
-      node.name.toLowerCase().includes(lowerQuery) ||
-      node.short_name.toLowerCase().includes(lowerQuery)
+      normalizeForSearch(node.name).includes(normalizedQuery) ||
+      normalizeForSearch(node.short_name).includes(normalizedQuery)
     )
   }
 
@@ -464,9 +465,10 @@ export default function UnitsPage(): React.JSX.Element {
     return searchTree(tree, searchQuery)
   }, [tree, searchQuery])
 
-  // Arama sonuçlarına göre expanded state'i hesapla
-  const computedExpanded = useMemo(() => {
-    if (!searchQuery.trim()) return expanded
+  // Arama değiştiğinde ilgili düğümleri otomatik aç (bir kerelik)
+  // expanded bağımlılık listesinde YOK → kullanıcı toggle'ları korunur
+  useEffect(() => {
+    if (!searchQuery.trim()) return
 
     const resultSet = new Set(filteredTree.map((r) => r.id))
     const expandedSet = new Set<number>()
@@ -482,15 +484,8 @@ export default function UnitsPage(): React.JSX.Element {
       }
     }
     tree.forEach(expandParents)
-    return expandedSet
-  }, [filteredTree, searchQuery, tree, expanded])
-
-  // Arama yapıldığında expanded state'i güncelle
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      setExpanded(computedExpanded)
-    }
-  }, [computedExpanded, searchQuery])
+    setExpanded(expandedSet)
+  }, [searchQuery, filteredTree, tree])
 
   const fetchItems = useCallback(async (): Promise<void> => {
     setLoading(true)

@@ -30,6 +30,10 @@ import type {
   CreateDistributionRequest,
   UpdateDistributionRequest,
   DeliverDistributionRequest,
+  CourierPendingDistribution,
+  BulkDeliverRequest,
+  BulkDeliverResponse,
+  DeliveredReceiptInfo,
   ServiceResponse,
   DocumentScope
 } from '@shared/types'
@@ -174,7 +178,11 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
         this.handleUpdateDistribution(data as UpdateDistributionRequest),
       'incoming-document:delete-distribution': (data) => this.handleDeleteDistribution(data),
       'incoming-document:deliver-distribution': (data) =>
-        this.handleDeliverDistribution(data as DeliverDistributionRequest)
+        this.handleDeliverDistribution(data as DeliverDistributionRequest),
+      'incoming-document:courier-pending': (data) => this.handleCourierPending(data),
+      'incoming-document:courier-bulk-deliver': (data) =>
+        this.handleCourierBulkDeliver(data as BulkDeliverRequest),
+      'incoming-document:courier-delivered-list': () => this.handleCourierDeliveredList()
     }
   }
 
@@ -390,5 +398,106 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
       const item = this.distributionRepository.markDeliveredWithoutReceipt(id)
       return this.ok(item, 'Teslim edildi (senet no gerektirmiyor)')
     }
+  }
+
+  // ---- Kurye İşlemleri ----
+
+  /** Birlik ID listesine göre teslim edilmemiş kurye dağıtımlarını getir */
+  private async handleCourierPending(
+    data: unknown
+  ): Promise<ServiceResponse<CourierPendingDistribution[]>> {
+    const { unit_ids } = data as { unit_ids: number[] }
+    if (!unit_ids || !Array.isArray(unit_ids) || unit_ids.length === 0) {
+      throw AppError.badRequest('En az bir birlik ID belirtilmelidir')
+    }
+    const list = this.distributionRepository.findPendingCourierByUnitIds(unit_ids)
+    return this.ok(
+      list,
+      list.length > 0
+        ? `${list.length} teslim edilmemiş dağıtım bulundu`
+        : 'Teslim edilmemiş dağıtım bulunamadı'
+    )
+  }
+
+  /** Seçilen dağıtım ID'lerini toplu teslim et */
+  private async handleCourierBulkDeliver(
+    data: BulkDeliverRequest
+  ): Promise<ServiceResponse<BulkDeliverResponse>> {
+    const { distribution_ids } = data
+    if (!distribution_ids || distribution_ids.length === 0) {
+      throw AppError.badRequest('En az bir dağıtım ID belirtilmelidir')
+    }
+
+    const delivered: DeliveredReceiptInfo[] = []
+    const failed: Array<{ distribution_id: number; reason: string }> = []
+
+    for (const distId of distribution_ids) {
+      try {
+        const existing = this.distributionRepository.findById(distId)
+        if (!existing) {
+          failed.push({ distribution_id: distId, reason: 'Dağıtım kaydı bulunamadı' })
+          continue
+        }
+        if (existing.is_delivered) {
+          failed.push({ distribution_id: distId, reason: 'Zaten teslim edilmiş' })
+          continue
+        }
+
+        // Kanalın senet gerekliliğini kontrol et
+        const channel = this.channelRepository.findById(existing.channel_id)
+        const isSenetRequired = channel?.is_senet_required ?? true
+
+        let receiptNo: number | null = null
+        let deliveryDate: string
+
+        if (isSenetRequired) {
+          receiptNo = this.receiptCounterRepository.getNextReceiptNo()
+          const result = this.distributionRepository.markDelivered(distId, receiptNo)
+          deliveryDate = result?.delivery_date ?? ''
+        } else {
+          const result = this.distributionRepository.markDeliveredWithoutReceipt(distId)
+          deliveryDate = result?.delivery_date ?? ''
+        }
+
+        // Evrak ve birlik bilgilerini al
+        const doc = this.repository.findById(existing.document_id)
+        const unit = this.unitRepository.findById(existing.unit_id)
+
+        delivered.push({
+          distribution_id: distId,
+          receipt_no: receiptNo,
+          delivery_date: deliveryDate,
+          document_id: existing.document_id,
+          record_date: doc?.record_date ?? '',
+          source_office: doc?.source_office ?? '',
+          reference_number: doc?.reference_number ?? '',
+          subject: doc?.subject ?? '',
+          document_date: doc?.document_date ?? '',
+          document_type: doc?.document_type ?? 'EVRAK',
+          classification_id: doc?.classification_id ?? 0,
+          security_control_no: doc?.security_control_no ?? '',
+          unit_name: unit?.short_name ?? unit?.name ?? String(existing.unit_id),
+          attachment_count: doc?.attachment_count ?? 0,
+          page_count: doc?.page_count ?? 0
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
+        failed.push({ distribution_id: distId, reason: message })
+      }
+    }
+
+    const msg = `${delivered.length} dağıtım teslim edildi${failed.length > 0 ? `, ${failed.length} başarısız` : ''}`
+    return this.ok({ delivered, failed }, msg)
+  }
+
+  /** Teslim edilmiş kurye dağıtımlarını getir (geçmiş listesi) */
+  private async handleCourierDeliveredList(): Promise<ServiceResponse<DeliveredReceiptInfo[]>> {
+    const list = this.distributionRepository.findDeliveredCourier()
+    return this.ok(
+      list,
+      list.length > 0
+        ? `${list.length} teslim edilmiş kayıt bulundu`
+        : 'Teslim edilmiş kayıt bulunamadı'
+    )
   }
 }
