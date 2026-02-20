@@ -98,20 +98,37 @@ export default function CourierDeliveredPage(): React.JSX.Element {
     [classifications]
   )
 
-  // Filtreleme: birlik + metin arama
+  // Filtreleme: birlik (rekürsif alt birlikleriyle) + metin arama
   const filteredList = useMemo(() => {
     let list = deliveredList
 
-    // Birlik filtresi — seçilen birliğin alt birlikleri dahil
+    // Birlik filtresi — seçilen birliğin tüm alt birlikleri (rekürsif, ucuna kadar)
     if (selectedUnitIds.length > 0) {
       const selectedId = selectedUnitIds[0]
-      const childUnits = units.filter((u) => u.parent_id === selectedId && u.is_active)
       const validNames = new Set<string>()
 
-      if (childUnits.length > 0) {
-        childUnits.forEach((c) => validNames.add(c.short_name || c.name))
+      /** Rekürsif olarak tüm alt birlik adlarını topla */
+      function collectDescendantNames(parentId: number): void {
+        const children = units.filter((u) => u.parent_id === parentId && u.is_active)
+        if (children.length > 0) {
+          children.forEach((c) => {
+            const grandChildren = units.filter((u) => u.parent_id === c.id && u.is_active)
+            if (grandChildren.length > 0) {
+              collectDescendantNames(c.id)
+            } else {
+              validNames.add(c.short_name || c.name)
+            }
+          })
+        } else {
+          // Yaprak birlik — kendisini ekle
+          const u = units.find((x) => x.id === parentId)
+          if (u) validNames.add(u.short_name || u.name)
+        }
       }
-      // Seçilen birliğin kendisi de dahil
+
+      collectDescendantNames(selectedId)
+
+      // Seçilen birliğin kendisini de dahil et
       const selectedUnit = units.find((u) => u.id === selectedId)
       if (selectedUnit) {
         validNames.add(selectedUnit.short_name || selectedUnit.name)
@@ -137,48 +154,32 @@ export default function CourierDeliveredPage(): React.JSX.Element {
     return list
   }, [deliveredList, searchQuery, selectedUnitIds, units])
 
-  // Alt birlik bazlı gruplandırma
+  // Alt birlik bazlı gruplandırma (dinamik, unit_name bazlı)
   const groupedData = useMemo(() => {
     const selectedId = selectedUnitIds[0] ?? null
     const selectedUnit = selectedId ? units.find((u) => u.id === selectedId) : null
-    const childUnits = selectedId
-      ? units.filter((u) => u.parent_id === selectedId && u.is_active)
-      : []
-    const hasSubUnits = childUnits.length > 0
 
-    const groups: Array<{ unitName: string; items: DeliveredReceiptInfo[] }> = []
-
-    if (hasSubUnits) {
-      const groupMap = new Map<string, DeliveredReceiptInfo[]>()
-      for (const d of filteredList) {
-        const arr = groupMap.get(d.unit_name) ?? []
-        arr.push(d)
-        groupMap.set(d.unit_name, arr)
-      }
-      for (const child of childUnits) {
-        const name = child.short_name || child.name
-        const items = groupMap.get(name)
-        if (items && items.length > 0) {
-          groups.push({ unitName: name, items })
-        }
-      }
-      // Doğrudan seçilen birliğe atanmış
-      const directName = selectedUnit?.short_name ?? selectedUnit?.name ?? ''
-      const directItems = groupMap.get(directName)
-      if (directItems && directItems.length > 0) {
-        groups.push({ unitName: directName, items: directItems })
-      }
-    } else if (selectedUnit) {
-      groups.push({
-        unitName: selectedUnit.short_name ?? selectedUnit.name ?? '',
-        items: filteredList
-      })
-    } else {
-      // Birlik seçilmemiş — gruplandırma yok
-      groups.push({ unitName: '', items: filteredList })
+    // unit_name bazlı grupla
+    const groupMap = new Map<string, DeliveredReceiptInfo[]>()
+    for (const d of filteredList) {
+      const arr = groupMap.get(d.unit_name) ?? []
+      arr.push(d)
+      groupMap.set(d.unit_name, arr)
     }
 
-    return groups
+    const groups = Array.from(groupMap.entries()).map(([unitName, items]) => ({
+      unitName,
+      items
+    }))
+
+    // Tek grup ve seçilen birliğin kendisi ise başlık göstermeye gerek yok
+    const showGroupHeaders =
+      groups.length > 1 ||
+      (groups.length === 1 &&
+        selectedUnit &&
+        groups[0].unitName !== (selectedUnit.short_name || selectedUnit.name))
+
+    return { groups, showGroupHeaders }
   }, [filteredList, selectedUnitIds, units])
 
   return (
@@ -343,25 +344,40 @@ export default function CourierDeliveredPage(): React.JSX.Element {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {groupedData.map((group) => (
+                  {groupedData.groups.map((group) => (
                     <React.Fragment key={group.unitName || '__all__'}>
-                      {/* Birlik başlık satırı (birlik seçildiyse) */}
-                      {group.unitName && (
+                      {/* Birlik başlık satırı — Badge ile belirgin */}
+                      {groupedData.showGroupHeaders && group.unitName && (
                         <Table.Tr>
                           <Table.Td
                             colSpan={11}
                             style={{
                               background: theme.colors.teal[0],
-                              fontWeight: 800,
-                              fontSize: '0.72rem',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.04em',
-                              color: theme.colors.teal[9],
-                              padding: '4px 8px',
+                              padding: '6px 8px',
                               borderBottom: '2px solid ' + theme.colors.teal[3]
                             }}
                           >
-                            {group.unitName}
+                            <Group gap="xs">
+                              <Badge
+                                variant="filled"
+                                color="teal"
+                                size="sm"
+                                radius="sm"
+                                styles={{
+                                  root: {
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    fontWeight: 800,
+                                    fontSize: '0.7rem'
+                                  }
+                                }}
+                              >
+                                {group.unitName}
+                              </Badge>
+                              <Badge variant="light" color="teal" size="xs">
+                                {group.items.length} evrak
+                              </Badge>
+                            </Group>
                           </Table.Td>
                         </Table.Tr>
                       )}

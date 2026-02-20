@@ -431,6 +431,18 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     const delivered: DeliveredReceiptInfo[] = []
     const failed: Array<{ distribution_id: number; reason: string }> = []
 
+    // İlk dağıtımın kanalından senet gerekliliğini kontrol et ve
+    // tek senet numarası üret — tüm belgeler aynı numarayı paylaşır
+    let sharedReceiptNo: number | null = null
+    const firstExisting = this.distributionRepository.findById(distribution_ids[0])
+    if (firstExisting) {
+      const channel = this.channelRepository.findById(firstExisting.channel_id)
+      const isSenetRequired = channel?.is_senet_required ?? true
+      if (isSenetRequired) {
+        sharedReceiptNo = this.receiptCounterRepository.getNextReceiptNo()
+      }
+    }
+
     for (const distId of distribution_ids) {
       try {
         const existing = this.distributionRepository.findById(distId)
@@ -443,16 +455,10 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
           continue
         }
 
-        // Kanalın senet gerekliliğini kontrol et
-        const channel = this.channelRepository.findById(existing.channel_id)
-        const isSenetRequired = channel?.is_senet_required ?? true
-
-        let receiptNo: number | null = null
         let deliveryDate: string
 
-        if (isSenetRequired) {
-          receiptNo = this.receiptCounterRepository.getNextReceiptNo()
-          const result = this.distributionRepository.markDelivered(distId, receiptNo)
+        if (sharedReceiptNo !== null) {
+          const result = this.distributionRepository.markDelivered(distId, sharedReceiptNo)
           deliveryDate = result?.delivery_date ?? ''
         } else {
           const result = this.distributionRepository.markDeliveredWithoutReceipt(distId)
@@ -465,7 +471,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
 
         delivered.push({
           distribution_id: distId,
-          receipt_no: receiptNo,
+          receipt_no: sharedReceiptNo,
           delivery_date: deliveryDate,
           document_id: existing.document_id,
           record_date: doc?.record_date ?? '',

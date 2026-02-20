@@ -2,9 +2,9 @@
 // CourierNotDeliveredPage - Kurye ile teslim edilmeyen evraklar
 //
 // Akış:
-// 1. UnitTreePicker ile birlik seç (tekli) → Listele
+// 1. UnitTreePicker ile birlik seç (tekli) → otomatik listele
 // 2. Tablo: teslim edilmemiş kurye dağıtımları (checkbox)
-//    - Alt birlikleri varsa birlik adıyla gruplandırılır
+//    - Alt birlikleri (rekürsif) varsa birlik adıyla gruplandırılır
 // 3. Toplu / tekli seçim → "Teslim Et ve Yazdır"
 // 4. Başarılı teslim → ReceiptPrintView modal açılır
 // ============================================================
@@ -24,7 +24,7 @@ import {
   ScrollArea,
   useMantineTheme
 } from '@mantine/core'
-import { IconSearch, IconPrinter, IconCheck } from '@tabler/icons-react'
+import { IconPrinter, IconCheck } from '@tabler/icons-react'
 import { UnitTreePicker } from '@renderer/components/common'
 import { incomingDocumentApi, unitApi, classificationApi } from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
@@ -84,47 +84,74 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     })
   }, [])
 
-  // Birlik seçimine göre alt birlikleri belirleme mantığı
+  // Birlik seçimine göre alt birlikleri belirleme mantığı (rekürsif — ucuna kadar)
   const resolvedUnitIds = useMemo(() => {
     if (selectedUnitIds.length === 0) return []
 
     const result: number[] = []
-    for (const uid of selectedUnitIds) {
-      // Bu birliğin alt birliği var mı kontrol et
-      const children = units.filter((u) => u.parent_id === uid && u.is_active)
+
+    /** Rekürsif olarak tüm alt birlikleri toplar */
+    function collectDescendants(parentId: number): void {
+      const children = units.filter((u) => u.parent_id === parentId && u.is_active)
       if (children.length > 0) {
-        // Alt birlikleri ekle (sadece direkt alt birlikler)
-        children.forEach((c) => result.push(c.id))
+        children.forEach((c) => {
+          // Alt birliğin de altı var mı bak — rekürsif
+          const grandChildren = units.filter((u) => u.parent_id === c.id && u.is_active)
+          if (grandChildren.length > 0) {
+            collectDescendants(c.id)
+          } else {
+            result.push(c.id)
+          }
+        })
       } else {
         // Alt birlik yoksa birliğin kendisini ekle
-        result.push(uid)
+        result.push(parentId)
       }
+    }
+
+    for (const uid of selectedUnitIds) {
+      collectDescendants(uid)
     }
     return [...new Set(result)] // Duplike önle
   }, [selectedUnitIds, units])
 
-  // Listele
-  const handleSearch = useCallback(async () => {
+  // Birlik seçimi değiştiğinde otomatik listele
+  useEffect(() => {
     if (resolvedUnitIds.length === 0) {
-      showError('Lütfen en az bir birlik seçin')
+      // Seçim temizlendi — listeyi sıfırla
+      setPendingList([])
+      setSelectedDistIds(new Set())
+      setHasSearched(false)
       return
     }
+
+    let cancelled = false
     setLoading(true)
     setHasSearched(true)
     setSelectedDistIds(new Set())
-    try {
-      const res = await incomingDocumentApi.courierPending(resolvedUnitIds)
-      if (res.success) {
-        setPendingList(res.data)
-      } else {
-        showError(res.message)
+
+    incomingDocumentApi
+      .courierPending(resolvedUnitIds)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setPendingList(res.data)
+        } else {
+          showError(res.message)
+          setPendingList([])
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        showError('Veri yüklenirken bir hata oluştu')
         setPendingList([])
-      }
-    } catch {
-      showError('Veri yüklenirken bir hata oluştu')
-      setPendingList([])
-    } finally {
-      setLoading(false)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
   }, [resolvedUnitIds])
 
@@ -216,7 +243,7 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
         </Text>
       </Stack>
 
-      {/* Arama kartı */}
+      {/* Birlik seçim kartı */}
       <Card
         withBorder
         shadow="sm"
@@ -224,28 +251,17 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
         padding="sm"
         style={{ flexShrink: 0, position: 'relative', zIndex: 20, overflow: 'visible' }}
       >
-        <Group gap="sm" align="flex-end">
-          <Box style={{ flex: 1 }}>
-            <Text size="xs" fw={600} c="dimmed" mb={4}>
-              Birlik Seçimi
-            </Text>
-            <UnitTreePicker
-              units={units}
-              values={selectedUnitIds}
-              onChange={setSelectedUnitIds}
-              singleSelect
-            />
-          </Box>
-          <Button
-            leftSection={<IconSearch size={16} />}
-            onClick={handleSearch}
-            loading={loading}
-            color="deniz"
-            size="sm"
-          >
-            Listele
-          </Button>
-        </Group>
+        <Box>
+          <Text size="xs" fw={600} c="dimmed" mb={4}>
+            Birlik Seçimi
+          </Text>
+          <UnitTreePicker
+            units={units}
+            values={selectedUnitIds}
+            onChange={setSelectedUnitIds}
+            singleSelect
+          />
+        </Box>
       </Card>
 
       {/* Evrak listesi */}
@@ -283,7 +299,7 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
         <Box style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {!hasSearched ? (
             <Text size="sm" c="dimmed" ta="center" py="xl">
-              Birlik seçip &quot;Listele&quot; butonuna tıklayarak evrakları görüntüleyin.
+              Birlik ağacından seçim yaparak evrakları görüntüleyin.
             </Text>
           ) : loading ? (
             <Text size="sm" c="dimmed" ta="center" py="xl">
@@ -367,71 +383,75 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
                 </Table.Thead>
                 <Table.Tbody>
                   {(() => {
-                    // Alt birlik bazlı gruplandırma
+                    // Alt birlik bazlı gruplandırma (rekürsif)
                     const selectedId = selectedUnitIds[0] ?? null
                     const selectedUnit = selectedId ? units.find((u) => u.id === selectedId) : null
-                    const childUnits = selectedId
-                      ? units.filter((u) => u.parent_id === selectedId && u.is_active)
-                      : []
-                    const hasSubUnits = childUnits.length > 0
 
-                    // Birlik bazlı grupla
-                    const groups: Array<{ unitName: string; items: CourierPendingDistribution[] }> =
-                      []
-
-                    if (hasSubUnits) {
-                      // Alt birliklere göre grupla
-                      const groupMap = new Map<number, CourierPendingDistribution[]>()
-                      for (const d of pendingList) {
-                        const arr = groupMap.get(d.unit_id) ?? []
-                        arr.push(d)
-                        groupMap.set(d.unit_id, arr)
-                      }
-                      for (const child of childUnits) {
-                        const items = groupMap.get(child.id)
-                        if (items && items.length > 0) {
-                          groups.push({
-                            unitName: child.short_name || child.name,
-                            items
-                          })
-                        }
-                      }
-                      // Doğrudan seçilen birliğe atanmış olanlar (alt birlik dışı)
-                      const directItems = groupMap.get(selectedId!)
-                      if (directItems && directItems.length > 0) {
-                        groups.push({
-                          unitName: selectedUnit?.short_name ?? selectedUnit?.name ?? '',
-                          items: directItems
-                        })
-                      }
-                    } else {
-                      // Alt birlik yoksa tek grup
-                      groups.push({
-                        unitName: selectedUnit?.short_name ?? selectedUnit?.name ?? '',
-                        items: pendingList
-                      })
+                    // unit_id'ye göre birlik adını bul
+                    const getUnitLabel = (unitId: number): string => {
+                      const u = units.find((x) => x.id === unitId)
+                      return u?.short_name || u?.name || String(unitId)
                     }
+
+                    // Evrakları unit_id bazlı grupla
+                    const groupMap = new Map<string, CourierPendingDistribution[]>()
+                    for (const d of pendingList) {
+                      const label = getUnitLabel(d.unit_id)
+                      const arr = groupMap.get(label) ?? []
+                      arr.push(d)
+                      groupMap.set(label, arr)
+                    }
+
+                    // Tek birlik mi, çoklu mu?
+                    const groups = Array.from(groupMap.entries()).map(([unitName, items]) => ({
+                      unitName,
+                      items
+                    }))
+
+                    // Tek grup ve seçilen birliğin kendisi ise başlık göstermeye gerek yok
+                    const showGroupHeaders =
+                      groups.length > 1 ||
+                      (groups.length === 1 &&
+                        selectedUnit &&
+                        groups[0].unitName !== (selectedUnit.short_name || selectedUnit.name))
 
                     return groups.map((group) => (
                       <React.Fragment key={group.unitName}>
-                        {/* Birlik başlık satırı */}
-                        <Table.Tr>
-                          <Table.Td
-                            colSpan={9}
-                            style={{
-                              background: theme.colors.deniz[0],
-                              fontWeight: 800,
-                              fontSize: '0.72rem',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.04em',
-                              color: theme.colors.deniz[9],
-                              padding: '4px 8px',
-                              borderBottom: `2px solid ${theme.colors.deniz[3]}`
-                            }}
-                          >
-                            {group.unitName}
-                          </Table.Td>
-                        </Table.Tr>
+                        {/* Birlik başlık satırı — Badge ile belirgin */}
+                        {showGroupHeaders && (
+                          <Table.Tr>
+                            <Table.Td
+                              colSpan={9}
+                              style={{
+                                background: theme.colors.deniz[0],
+                                padding: '6px 8px',
+                                borderBottom: `2px solid ${theme.colors.deniz[3]}`
+                              }}
+                            >
+                              <Group gap="xs">
+                                <Badge
+                                  variant="filled"
+                                  color="deniz"
+                                  size="sm"
+                                  radius="sm"
+                                  styles={{
+                                    root: {
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.05em',
+                                      fontWeight: 800,
+                                      fontSize: '0.7rem'
+                                    }
+                                  }}
+                                >
+                                  {group.unitName}
+                                </Badge>
+                                <Badge variant="light" color="deniz" size="xs">
+                                  {group.items.length} evrak
+                                </Badge>
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        )}
                         {group.items.map((d) => {
                           const isSelected = selectedDistIds.has(d.distribution_id)
                           return (
