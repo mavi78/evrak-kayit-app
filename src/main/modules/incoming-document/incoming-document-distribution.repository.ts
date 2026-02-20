@@ -26,6 +26,8 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
   is_delivered INTEGER NOT NULL DEFAULT 0 CHECK(is_delivered IN (0, 1)),
   delivery_date TEXT,
   receipt_no INTEGER,
+  delivered_by_user_id INTEGER,
+  delivered_by_name TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (unit_id) REFERENCES units(id),
@@ -56,28 +58,37 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
     })
   }
 
-  /** Teslim işareti — senet no ve delivery_date ile güncelleme */
-  markDelivered(id: number, receiptNo: number): DocumentDistribution | null {
+  /** Teslim işareti — senet no, delivery_date ve teslim eden kullanıcı ile güncelleme */
+  markDelivered(
+    id: number,
+    receiptNo: number,
+    deliveredByUserId: number,
+    deliveredByName: string
+  ): DocumentDistribution | null {
     return this.safeExecute(() => {
       const now = new Date()
       const deliveryDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
       const stmt = this.db.prepare(
-        `UPDATE ${TABLE_NAME} SET is_delivered = 1, delivery_date = ?, receipt_no = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`
+        `UPDATE ${TABLE_NAME} SET is_delivered = 1, delivery_date = ?, receipt_no = ?, delivered_by_user_id = ?, delivered_by_name = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`
       )
-      stmt.run(deliveryDate, receiptNo, id)
+      stmt.run(deliveryDate, receiptNo, deliveredByUserId, deliveredByName, id)
       return this.findById(id)
     })
   }
 
-  /** Teslim işareti — senet no olmadan (receipt_no = null), sadece delivery_date ile */
-  markDeliveredWithoutReceipt(id: number): DocumentDistribution | null {
+  /** Teslim işareti — senet no olmadan (receipt_no = null), sadece delivery_date ve kullanıcı bilgisi ile */
+  markDeliveredWithoutReceipt(
+    id: number,
+    deliveredByUserId: number,
+    deliveredByName: string
+  ): DocumentDistribution | null {
     return this.safeExecute(() => {
       const now = new Date()
       const deliveryDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
       const stmt = this.db.prepare(
-        `UPDATE ${TABLE_NAME} SET is_delivered = 1, delivery_date = ?, receipt_no = NULL, updated_at = datetime('now', 'localtime') WHERE id = ?`
+        `UPDATE ${TABLE_NAME} SET is_delivered = 1, delivery_date = ?, receipt_no = NULL, delivered_by_user_id = ?, delivered_by_name = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`
       )
-      stmt.run(deliveryDate, id)
+      stmt.run(deliveryDate, deliveredByUserId, deliveredByName, id)
       return this.findById(id)
     })
   }
@@ -127,9 +138,28 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
   /**
    * Kurye kanalıyla teslim edilmiş dağıtımlar — evrak ve birlik detaylarıyla.
    * CourierDeliveredPage için kullanılır.
+   * @param dateFrom Başlangıç tarihi (YYYY-MM-DD)
+   * @param dateTo Bitiş tarihi (YYYY-MM-DD)
+   * @param unitIds Opsiyonel birlik ID filtresi
    */
-  findDeliveredCourier(): DeliveredReceiptInfo[] {
+  findDeliveredCourier(
+    dateFrom: string,
+    dateTo: string,
+    unitIds?: number[]
+  ): DeliveredReceiptInfo[] {
     return this.safeExecute(() => {
+      const params: (string | number)[] = []
+
+      let unitFilter = ''
+      if (unitIds && unitIds.length > 0) {
+        const placeholders = unitIds.map(() => '?').join(', ')
+        unitFilter = `AND (d.unit_id IN (${placeholders}) OR d.parent_unit_id IN (${placeholders}))`
+        params.push(...unitIds, ...unitIds)
+      }
+
+      // delivery_date YYYY-MM-DD HH:MM:SS formatında — DATE() ile gün bazlı karşılaştır
+      params.push(dateFrom, dateTo)
+
       const sql = `
         SELECT
           d.id AS distribution_id,
@@ -146,7 +176,8 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
           doc.security_control_no,
           COALESCE(u.short_name, u.name, CAST(d.unit_id AS TEXT)) AS unit_name,
           doc.attachment_count,
-          doc.page_count
+          doc.page_count,
+          d.delivered_by_name
         FROM ${TABLE_NAME} d
         INNER JOIN incoming_documents doc ON d.document_id = doc.id
         INNER JOIN channels ch ON d.channel_id = ch.id
@@ -154,9 +185,12 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
         WHERE d.is_delivered = 1
           AND d.document_scope = 'INCOMING'
           AND LOWER(ch.name) = 'kurye'
-        ORDER BY d.delivery_date DESC
+          ${unitFilter}
+          AND DATE(d.delivery_date) >= ?
+          AND DATE(d.delivery_date) <= ?
+        ORDER BY d.receipt_no DESC, d.document_id ASC
       `
-      return this.db.prepare(sql).all() as DeliveredReceiptInfo[]
+      return this.db.prepare(sql).all(...params) as DeliveredReceiptInfo[]
     })
   }
 }

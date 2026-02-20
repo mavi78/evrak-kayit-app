@@ -52,6 +52,10 @@ export interface DocumentDistribution extends BaseEntity {
   delivery_date: string | null
   receipt_no: number | null
   postal_envelope_id: number | null
+  /** Teslim eden kullanıcı ID */
+  delivered_by_user_id: number | null
+  /** Teslim eden kullanıcı adı (snapshot) */
+  delivered_by_name: string | null
 }
 
 /** Tarihi alanından çıkarılan sonuç (frontend/backend ortak) */
@@ -165,6 +169,10 @@ export interface CourierPendingDistribution {
 /** Toplu teslim isteği */
 export interface BulkDeliverRequest {
   distribution_ids: number[]
+  /** Teslim eden kullanıcı ID */
+  delivered_by_user_id: number
+  /** Teslim eden kullanıcı adı (snapshot — sonradan isim değişse bile senet'te kalır) */
+  delivered_by_name: string
 }
 
 /** Teslim edilen dağıtım bilgisi — senet yazdırma için */
@@ -185,10 +193,33 @@ export interface DeliveredReceiptInfo {
   unit_name: string
   attachment_count: number
   page_count: number
+  /** Teslim eden kullanıcı adı */
+  delivered_by_name: string | null
 }
 
 /** Toplu teslim sonucu */
 export interface BulkDeliverResponse {
   delivered: DeliveredReceiptInfo[]
-  failed: Array<{ distribution_id: number; reason: string }>
+  failed: Array<{
+    distribution_id: number
+    reason: string
+    /** Zaten teslim edilmişse, teslim eden kullanıcı adı */
+    already_delivered_by?: string
+    /** Zaten teslim edilmişse, senet no */
+    already_receipt_no?: number | null
+    /** Çakışan belgenin K.No (document_id) */
+    document_id?: number
+    /** Çakışan belgenin konusu */
+    subject?: string
+  }>
+}
+
+/** Teslim edilmiş kurye dağıtımları filtre isteği */
+export interface CourierDeliveredListRequest {
+  /** Başlangıç tarihi (YYYY-MM-DD) — varsayılan: bugün */
+  date_from: string
+  /** Bitiş tarihi (YYYY-MM-DD) — varsayılan: bugün */
+  date_to: string
+  /** Birlik ID filtresi (opsiyonel — boş dizi = tümü) */
+  unit_ids?: number[]
 }

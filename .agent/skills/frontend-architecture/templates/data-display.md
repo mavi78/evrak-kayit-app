@@ -12,8 +12,19 @@ State yönetimi → Veri çekme → Form → Handlers → Filtreleme → Render
 // src/renderer/src/pages/{modul}/{Modul}Page.tsx
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Title, Text, Stack, Card, Button, Group, Table, Badge,
-  ActionIcon, TextInput, Modal, Loader, Center
+  Title,
+  Text,
+  Stack,
+  Card,
+  Button,
+  Group,
+  Table,
+  Badge,
+  ActionIcon,
+  TextInput,
+  Modal,
+  Loader,
+  Center
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
@@ -47,14 +58,16 @@ export default function YourPage(): React.JSX.Element {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchItems() }, [fetchItems])
+  useEffect(() => {
+    fetchItems()
+  }, [fetchItems])
 
   // === Form ===
   const createForm = useForm<CreateYourRequest>({
     initialValues: { title: '' },
     validate: {
-      title: (v) => (v.trim().length === 0 ? 'Başlık zorunludur' : null),
-    },
+      title: (v) => (v.trim().length === 0 ? 'Başlık zorunludur' : null)
+    }
   })
 
   // === Handlers ===
@@ -90,7 +103,11 @@ export default function YourPage(): React.JSX.Element {
 
   // === Loading State ===
   if (loading) {
-    return <Center h="50vh"><Loader size="lg" type="dots" /></Center>
+    return (
+      <Center h="50vh">
+        <Loader size="lg" type="dots" />
+      </Center>
+    )
   }
 
   // === Render ===
@@ -100,7 +117,9 @@ export default function YourPage(): React.JSX.Element {
       <Group justify="space-between">
         <div>
           <Title order={2}>Modül Başlığı</Title>
-          <Text c="dimmed" mt={4}>Açıklama metni</Text>
+          <Text c="dimmed" mt={4}>
+            Açıklama metni
+          </Text>
         </div>
         <Group>
           <Button leftSection={<IconRefresh size={16} />} variant="light" onClick={fetchItems}>
@@ -143,16 +162,24 @@ export default function YourPage(): React.JSX.Element {
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
-                    <ActionIcon variant="light" color="blue" onClick={() => {
-                      setSelectedItem(item)
-                      openEdit()
-                    }}>
+                    <ActionIcon
+                      variant="light"
+                      color="blue"
+                      onClick={() => {
+                        setSelectedItem(item)
+                        openEdit()
+                      }}
+                    >
                       <IconEdit size={16} />
                     </ActionIcon>
-                    <ActionIcon variant="light" color="red" onClick={() => {
-                      setSelectedItem(item)
-                      openDelete()
-                    }}>
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={() => {
+                        setSelectedItem(item)
+                        openDelete()
+                      }}
+                    >
                       <IconTrash size={16} />
                     </ActionIcon>
                   </Group>
@@ -163,7 +190,9 @@ export default function YourPage(): React.JSX.Element {
         </Table>
 
         {filteredItems.length === 0 && (
-          <Text c="dimmed" ta="center" py="xl">Kayıt bulunamadı</Text>
+          <Text c="dimmed" ta="center" py="xl">
+            Kayıt bulunamadı
+          </Text>
         )}
       </Card>
 
@@ -172,7 +201,9 @@ export default function YourPage(): React.JSX.Element {
         <form onSubmit={createForm.onSubmit(handleCreate)}>
           <Stack gap="md">
             <TextInput label="Başlık" {...createForm.getInputProps('title')} />
-            <Button type="submit" loading={submitting} fullWidth>Kaydet</Button>
+            <Button type="submit" loading={submitting} fullWidth>
+              Kaydet
+            </Button>
           </Stack>
         </form>
       </Modal>
@@ -183,8 +214,12 @@ export default function YourPage(): React.JSX.Element {
           <strong>{selectedItem?.title}</strong> kaydını silmek istediğinize emin misiniz?
         </Text>
         <Group mt="md" justify="flex-end">
-          <Button variant="default" onClick={closeDelete}>İptal</Button>
-          <Button color="red" onClick={handleDelete} loading={submitting}>Sil</Button>
+          <Button variant="default" onClick={closeDelete}>
+            İptal
+          </Button>
+          <Button color="red" onClick={handleDelete} loading={submitting}>
+            Sil
+          </Button>
         </Group>
       </Modal>
     </Stack>
@@ -195,17 +230,19 @@ export default function YourPage(): React.JSX.Element {
 ## Boş State Gösterimi
 
 ```tsx
-{items.length === 0 && (
-  <Card>
-    <Stack align="center" py="xl" gap="sm">
-      <IconInbox size={48} stroke={1} color="var(--mantine-color-dimmed)" />
-      <Text c="dimmed">Henüz kayıt bulunmuyor</Text>
-      <Button variant="light" leftSection={<IconPlus size={16} />} onClick={openCreate}>
-        İlk Kaydı Oluştur
-      </Button>
-    </Stack>
-  </Card>
-)}
+{
+  items.length === 0 && (
+    <Card>
+      <Stack align="center" py="xl" gap="sm">
+        <IconInbox size={48} stroke={1} color="var(--mantine-color-dimmed)" />
+        <Text c="dimmed">Henüz kayıt bulunmuyor</Text>
+        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={openCreate}>
+          İlk Kaydı Oluştur
+        </Button>
+      </Stack>
+    </Card>
+  )
+}
 ```
 
 ## Tarih Gösterimi
@@ -215,5 +252,5 @@ import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
 // Tablo hücresinde
-<Table.Td>{format(new Date(item.created_at), 'dd.MM.yyyy HH:mm', { locale: tr })}</Table.Td>
+;<Table.Td>{format(new Date(item.created_at), 'dd.MM.yyyy HH:mm', { locale: tr })}</Table.Td>
 ```

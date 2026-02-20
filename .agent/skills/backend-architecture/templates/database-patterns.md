@@ -17,13 +17,13 @@ CREATE TABLE IF NOT EXISTS table_name (
 
 ### Veri Tipi Eşleştirmesi
 
-| TypeScript | SQLite | Kural |
-|-----------|--------|-------|
-| `number` | `INTEGER` veya `REAL` | Tam sayı: INTEGER, ondalık: REAL |
-| `string` | `TEXT` | Her zaman TEXT (VARCHAR yok) |
-| `boolean` | `INTEGER` | `CHECK(col IN (0, 1))` + getBooleanColumns |
-| `Date` | `TEXT` | `datetime('now', 'localtime')` format |
-| `enum` | `TEXT` | `CHECK(col IN ('val1', 'val2'))` |
+| TypeScript | SQLite                | Kural                                      |
+| ---------- | --------------------- | ------------------------------------------ |
+| `number`   | `INTEGER` veya `REAL` | Tam sayı: INTEGER, ondalık: REAL           |
+| `string`   | `TEXT`                | Her zaman TEXT (VARCHAR yok)               |
+| `boolean`  | `INTEGER`             | `CHECK(col IN (0, 1))` + getBooleanColumns |
+| `Date`     | `TEXT`                | `datetime('now', 'localtime')` format      |
+| `enum`     | `TEXT`                | `CHECK(col IN ('val1', 'val2'))`           |
 
 ### Boolean Alan Kuralı
 
@@ -80,8 +80,7 @@ this.db.prepare(`SELECT * FROM users WHERE username = '${username}'`)
 
 ```typescript
 // Varsayılan: yeniden eskiye (BaseRepository.findAll)
-`SELECT * FROM ${this.getTableName()} ORDER BY id DESC`
-
+;`SELECT * FROM ${this.getTableName()} ORDER BY id DESC`
 // Özel sıralama
 `SELECT * FROM table_name ORDER BY created_at DESC, title ASC`
 ```
@@ -140,10 +139,10 @@ transferDocument(fromId: number, toId: number): void {
 
 ```typescript
 // Mevcut pragma ayarları (ağ paylaşımı uyumlu)
-journal_mode = DELETE    // WAL yerine DELETE (ağ güvenli)
-busy_timeout = 10000     // 10sn bekle (ağ gecikmesi)
-foreign_keys = ON        // Referans bütünlüğü
-synchronous = NORMAL     // Performans/güvenlik dengesi
+journal_mode = DELETE // WAL yerine DELETE (ağ güvenli)
+busy_timeout = 10000 // 10sn bekle (ağ gecikmesi)
+foreign_keys = ON // Referans bütünlüğü
+synchronous = NORMAL // Performans/güvenlik dengesi
 ```
 
 ### Veritabanı Dosya Konumu

@@ -48,6 +48,7 @@ import type {
   BulkDeliverRequest,
   BulkDeliverResponse,
   DeliveredReceiptInfo,
+  CourierDeliveredListRequest,
   DocumentScope,
   AppSetting,
   AppSettingKey,
@@ -293,8 +294,10 @@ export const incomingDocumentApi = {
   courierBulkDeliver: (data: BulkDeliverRequest): Promise<ServiceResponse<BulkDeliverResponse>> =>
     invoke<BulkDeliverResponse>('incoming-document:courier-bulk-deliver', data),
 
-  courierDeliveredList: (): Promise<ServiceResponse<DeliveredReceiptInfo[]>> =>
-    invoke<DeliveredReceiptInfo[]>('incoming-document:courier-delivered-list')
+  courierDeliveredList: (
+    data: CourierDeliveredListRequest
+  ): Promise<ServiceResponse<DeliveredReceiptInfo[]>> =>
+    invoke<DeliveredReceiptInfo[]>('incoming-document:courier-delivered-list', data)
 }
 
 // ============================================================

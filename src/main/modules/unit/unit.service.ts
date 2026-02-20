@@ -85,19 +85,11 @@ export class UnitService extends BaseService<Unit> {
       const nameToCheck = input.name !== undefined ? input.name.trim() : current.name
       const shortNameToCheck =
         input.short_name !== undefined ? input.short_name.trim() : current.short_name
-      if (
-        this.repository.findByNameAndParent(nameToCheck, input.parent_id ?? null, id)
-      ) {
-        throw AppError.badRequest(
-          'Taşıma yapılamaz: Hedef seviyede aynı birlik adı zaten mevcut'
-        )
+      if (this.repository.findByNameAndParent(nameToCheck, input.parent_id ?? null, id)) {
+        throw AppError.badRequest('Taşıma yapılamaz: Hedef seviyede aynı birlik adı zaten mevcut')
       }
-      if (
-        this.repository.findByShortNameAndParent(shortNameToCheck, input.parent_id ?? null, id)
-      ) {
-        throw AppError.badRequest(
-          'Taşıma yapılamaz: Hedef seviyede aynı kısa ad zaten mevcut'
-        )
+      if (this.repository.findByShortNameAndParent(shortNameToCheck, input.parent_id ?? null, id)) {
+        throw AppError.badRequest('Taşıma yapılamaz: Hedef seviyede aynı kısa ad zaten mevcut')
       }
     }
     if (input.name !== undefined) {
@@ -106,7 +98,9 @@ export class UnitService extends BaseService<Unit> {
       }
     }
     if (input.short_name !== undefined) {
-      if (this.repository.findByShortNameAndParent(input.short_name.trim(), effectiveParentId, id)) {
+      if (
+        this.repository.findByShortNameAndParent(input.short_name.trim(), effectiveParentId, id)
+      ) {
         throw AppError.badRequest('Bu seviyede aynı kısa ad zaten kayıtlı')
       }
     }
@@ -138,14 +132,10 @@ export class UnitService extends BaseService<Unit> {
     // Taşıma hedefinde aynı ad veya kısa ad varsa taşımaya izin verme
     const targetParentId = input.parent_id ?? null
     if (this.repository.findByNameAndParent(unit.name, targetParentId, unit.id)) {
-      throw AppError.badRequest(
-        'Taşıma yapılamaz: Hedef seviyede aynı birlik adı zaten mevcut'
-      )
+      throw AppError.badRequest('Taşıma yapılamaz: Hedef seviyede aynı birlik adı zaten mevcut')
     }
     if (this.repository.findByShortNameAndParent(unit.short_name, targetParentId, unit.id)) {
-      throw AppError.badRequest(
-        'Taşıma yapılamaz: Hedef seviyede aynı kısa ad zaten mevcut'
-      )
+      throw AppError.badRequest('Taşıma yapılamaz: Hedef seviyede aynı kısa ad zaten mevcut')
     }
     const item = this.repository.updateHierarchy(input.id, input.parent_id, input.sort_order)
     return this.ok(item, 'Birlik hiyerarşisi güncellendi')

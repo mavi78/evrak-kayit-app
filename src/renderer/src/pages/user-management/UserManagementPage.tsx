@@ -313,9 +313,7 @@ export default function UserManagementPage(): React.JSX.Element {
                     {user.is_active ? 'Aktif' : 'Pasif'}
                   </Badge>
                 </Table.Td>
-                <Table.Td>
-                  {formatIsoToDisplayWithTime(user.updated_at)}
-                </Table.Td>
+                <Table.Td>{formatIsoToDisplayWithTime(user.updated_at)}</Table.Td>
                 <Table.Td>
                   <Group gap="xs">
                     <Tooltip

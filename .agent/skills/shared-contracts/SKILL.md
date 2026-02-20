@@ -264,11 +264,11 @@ const PAGES_REQUIRING_PERMISSION: readonly PageKey[] = [
 
 ### Erişim Kuralları
 
-| Sabit                        | Açıklama                                         | Sayfalar                                     |
-| ---------------------------- | ------------------------------------------------ | -------------------------------------------- |
-| `PUBLIC_PAGES`               | Herkes erişebilir (izin kontrolü yok)            | dashboard                                    |
+| Sabit                        | Açıklama                                         | Sayfalar                                                                      |
+| ---------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `PUBLIC_PAGES`               | Herkes erişebilir (izin kontrolü yok)            | dashboard                                                                     |
 | `PAGES_REQUIRING_PERMISSION` | İzin tablosu + rol varsayılanıyla kontrol edilir | incoming-documents, user-management, page-management, settings-\*, courier-\* |
-| `MENU_PAGE_KEYS`             | Menüde/route'ta aktif olan tüm sayfalar          | dashboard + izinli sayfalar                  |
+| `MENU_PAGE_KEYS`             | Menüde/route'ta aktif olan tüm sayfalar          | dashboard + izinli sayfalar                                                   |
 
 ### DEFAULT_PAGINATION
 

@@ -88,7 +88,7 @@ export interface ChangePasswordRequest {
   user_id: number
   new_password: string
   changed_by: number
-  old_password?: string  // user_id === changed_by ise zorunlu
+  old_password?: string // user_id === changed_by ise zorunlu
 }
 
 export interface SetPermissionRequest {
@@ -228,7 +228,7 @@ export const PAGE_KEYS = {
   SETTINGS: 'settings',
   LOGS: 'logs',
   COURIER_DELIVERED: 'courier-delivered',
-  COURIER_NOT_DELIVERED: 'courier-not-delivered',
+  COURIER_NOT_DELIVERED: 'courier-not-delivered'
   // YOUR_MODULE: 'your-module',  // ← Yeni modül eklerken buraya satır ekle
 } as const
 

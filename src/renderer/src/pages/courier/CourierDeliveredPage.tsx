@@ -1,8 +1,9 @@
 // ============================================================
 // CourierDeliveredPage - Teslim edilen kurye evrakları
 //
-// Geçmiş teslim kayıtlarını gösterir. Tekrar yazdırma imkanı sunar.
-// Birlik seçimi ile filtreleme + alt birlik bazlı gruplandırma
+// Geçmiş teslim kayıtlarını SENET NUMARASI bazlı gruplandırarak gösterir.
+// Tarih aralığı (varsayılan: bugün) + birlik seçimi ile filtreleme.
+// Tekrar yazdırma senet grubu üzerinden yapılır.
 // ============================================================
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
@@ -17,16 +18,16 @@ import {
   Badge,
   ScrollArea,
   ActionIcon,
+  Collapse,
   TextInput,
   useMantineTheme
 } from '@mantine/core'
-import { IconPrinter, IconSearch, IconX } from '@tabler/icons-react'
+import { IconPrinter, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { incomingDocumentApi, unitApi, classificationApi } from '@renderer/lib/api'
 import { showError } from '@renderer/lib/notifications'
 import { ReceiptPrintView } from '@renderer/components/common/ReceiptPrintView/ReceiptPrintView'
 import { UnitTreePicker } from '@renderer/components/common'
 import type { DeliveredReceiptInfo, Classification, Unit } from '@shared/types'
-import { normalizeForSearch } from '@shared/utils/searchUtils'
 
 /** Tarih formatlama: YYYY-MM-DD → DD.MM.YYYY */
 function formatDate(dateStr: string): string {
@@ -47,6 +48,29 @@ function formatDeliveryDate(dateStr: string): string {
   return timePart ? datePart + ' ' + timePart : datePart
 }
 
+/** Date nesnesini YYYY-MM-DD string'e çevir */
+function toIsoDateStr(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** Senet grubunun tüm birlik adlarını benzersiz olarak birleştir */
+function getUniqueUnitNames(items: DeliveredReceiptInfo[]): string {
+  const names = new Set(items.map((i) => i.unit_name))
+  return Array.from(names).join(', ')
+}
+
+/** Senet numarası bazlı grup tipi */
+interface ReceiptGroup {
+  receiptNo: number | null
+  items: DeliveredReceiptInfo[]
+  unitNames: string
+  deliveryDate: string
+  deliveredByName: string | null
+}
+
 export default function CourierDeliveredPage(): React.JSX.Element {
   const theme = useMantineTheme()
 
@@ -54,7 +78,11 @@ export default function CourierDeliveredPage(): React.JSX.Element {
   const [classifications, setClassifications] = useState<Classification[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+
+  // Tarih filtresi — varsayılan: bugün (YYYY-MM-DD string)
+  const todayStr = toIsoDateStr(new Date())
+  const [dateFrom, setDateFrom] = useState<string>(todayStr)
+  const [dateTo, setDateTo] = useState<string>(todayStr)
 
   // Birlik seçimi (tekli)
   const [selectedUnitIds, setSelectedUnitIds] = useState<number[]>([])
@@ -62,31 +90,74 @@ export default function CourierDeliveredPage(): React.JSX.Element {
   // Tekrar yazdırma
   const [printData, setPrintData] = useState<DeliveredReceiptInfo[] | null>(null)
 
-  // Verileri yükle
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await incomingDocumentApi.courierDeliveredList()
-      if (res.success) {
-        setDeliveredList(res.data)
-      } else {
-        showError(res.message)
-      }
-    } catch {
-      showError('Veriler yüklenirken hata oluştu')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Açık/kapalı senet grupları
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
+  // Referans verileri yükle (bir kez)
   useEffect(() => {
-    void loadData()
     classificationApi.getAll().then((res) => {
       if (res.success) setClassifications(res.data)
     })
     unitApi.getAll().then((res) => {
       if (res.success) setUnits(res.data)
     })
+  }, [])
+
+  // Birlik seçimine göre alt birlikleri belirleme mantığı (rekürsif)
+  const resolvedUnitIds = useMemo(() => {
+    if (selectedUnitIds.length === 0) return []
+
+    const result: number[] = []
+
+    function collectDescendants(parentId: number): void {
+      const children = units.filter((u) => u.parent_id === parentId && u.is_active)
+      if (children.length > 0) {
+        children.forEach((c) => {
+          const grandChildren = units.filter((u) => u.parent_id === c.id && u.is_active)
+          if (grandChildren.length > 0) {
+            collectDescendants(c.id)
+          } else {
+            result.push(c.id)
+          }
+        })
+      } else {
+        result.push(parentId)
+      }
+    }
+
+    for (const uid of selectedUnitIds) {
+      collectDescendants(uid)
+    }
+    return [...new Set(result)]
+  }, [selectedUnitIds, units])
+
+  // Verileri yükle (tarih/birlik değiştiğinde)
+  const loadData = useCallback(async () => {
+    if (!dateFrom || !dateTo) return
+    setLoading(true)
+    try {
+      const res = await incomingDocumentApi.courierDeliveredList({
+        date_from: dateFrom,
+        date_to: dateTo,
+        unit_ids: resolvedUnitIds.length > 0 ? resolvedUnitIds : undefined
+      })
+      if (res.success) {
+        setDeliveredList(res.data)
+      } else {
+        showError(res.message)
+        setDeliveredList([])
+      }
+    } catch {
+      showError('Veriler yüklenirken hata oluştu')
+      setDeliveredList([])
+    } finally {
+      setLoading(false)
+    }
+  }, [dateFrom, dateTo, resolvedUnitIds])
+
+  // Tarih veya birlik değişince otomatik yükle
+  useEffect(() => {
+    void loadData()
   }, [loadData])
 
   // Sınıflandırma adı
@@ -98,89 +169,49 @@ export default function CourierDeliveredPage(): React.JSX.Element {
     [classifications]
   )
 
-  // Filtreleme: birlik (rekürsif alt birlikleriyle) + metin arama
-  const filteredList = useMemo(() => {
-    let list = deliveredList
-
-    // Birlik filtresi — seçilen birliğin tüm alt birlikleri (rekürsif, ucuna kadar)
-    if (selectedUnitIds.length > 0) {
-      const selectedId = selectedUnitIds[0]
-      const validNames = new Set<string>()
-
-      /** Rekürsif olarak tüm alt birlik adlarını topla */
-      function collectDescendantNames(parentId: number): void {
-        const children = units.filter((u) => u.parent_id === parentId && u.is_active)
-        if (children.length > 0) {
-          children.forEach((c) => {
-            const grandChildren = units.filter((u) => u.parent_id === c.id && u.is_active)
-            if (grandChildren.length > 0) {
-              collectDescendantNames(c.id)
-            } else {
-              validNames.add(c.short_name || c.name)
-            }
-          })
-        } else {
-          // Yaprak birlik — kendisini ekle
-          const u = units.find((x) => x.id === parentId)
-          if (u) validNames.add(u.short_name || u.name)
-        }
-      }
-
-      collectDescendantNames(selectedId)
-
-      // Seçilen birliğin kendisini de dahil et
-      const selectedUnit = units.find((u) => u.id === selectedId)
-      if (selectedUnit) {
-        validNames.add(selectedUnit.short_name || selectedUnit.name)
-      }
-
-      list = list.filter((d) => validNames.has(d.unit_name))
-    }
-
-    // Metin arama
-    if (searchQuery.trim()) {
-      const q = normalizeForSearch(searchQuery)
-      list = list.filter(
-        (d) =>
-          normalizeForSearch(d.source_office).includes(q) ||
-          normalizeForSearch(d.reference_number).includes(q) ||
-          normalizeForSearch(d.subject).includes(q) ||
-          normalizeForSearch(d.unit_name).includes(q) ||
-          String(d.receipt_no).includes(q) ||
-          String(d.document_id).includes(q)
-      )
-    }
-
-    return list
-  }, [deliveredList, searchQuery, selectedUnitIds, units])
-
-  // Alt birlik bazlı gruplandırma (dinamik, unit_name bazlı)
-  const groupedData = useMemo(() => {
-    const selectedId = selectedUnitIds[0] ?? null
-    const selectedUnit = selectedId ? units.find((u) => u.id === selectedId) : null
-
-    // unit_name bazlı grupla
+  // Senet numarası bazlı gruplama
+  const receiptGroups = useMemo((): ReceiptGroup[] => {
     const groupMap = new Map<string, DeliveredReceiptInfo[]>()
-    for (const d of filteredList) {
-      const arr = groupMap.get(d.unit_name) ?? []
+
+    for (const d of deliveredList) {
+      const key = d.receipt_no != null ? String(d.receipt_no) : `no-receipt-${d.distribution_id}`
+      const arr = groupMap.get(key) ?? []
       arr.push(d)
-      groupMap.set(d.unit_name, arr)
+      groupMap.set(key, arr)
     }
 
-    const groups = Array.from(groupMap.entries()).map(([unitName, items]) => ({
-      unitName,
-      items
+    return Array.from(groupMap.entries()).map(([, items]) => ({
+      receiptNo: items[0].receipt_no,
+      items,
+      unitNames: getUniqueUnitNames(items),
+      deliveryDate: items[0].delivery_date,
+      deliveredByName: items[0].delivered_by_name
     }))
+  }, [deliveredList])
 
-    // Tek grup ve seçilen birliğin kendisi ise başlık göstermeye gerek yok
-    const showGroupHeaders =
-      groups.length > 1 ||
-      (groups.length === 1 &&
-        selectedUnit &&
-        groups[0].unitName !== (selectedUnit.short_name || selectedUnit.name))
+  // Toplam senet ve evrak sayısı
+  const totalReceipts = receiptGroups.length
+  const totalDocs = deliveredList.length
 
-    return { groups, showGroupHeaders }
-  }, [filteredList, selectedUnitIds, units])
+  // Grup aç/kapat toggle
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  // Tüm grupları aç/kapat
+  const allExpanded = expandedGroups.size === receiptGroups.length && receiptGroups.length > 0
+  const toggleAll = useCallback(() => {
+    if (allExpanded) {
+      setExpandedGroups(new Set())
+    } else {
+      setExpandedGroups(new Set(receiptGroups.map((g) => String(g.receiptNo ?? 'null'))))
+    }
+  }, [allExpanded, receiptGroups])
 
   return (
     <Box
@@ -199,7 +230,8 @@ export default function CourierDeliveredPage(): React.JSX.Element {
           Teslim Edilen
         </Title>
         <Text size="sm" c="dimmed">
-          Kurye kanalıyla teslim edilmiş evrakların geçmiş kayıtları.
+          Kurye kanalıyla teslim edilmiş evrakları senet numarası bazlı listeleyin ve tekrar
+          yazdırın.
         </Text>
       </Stack>
 
@@ -212,9 +244,25 @@ export default function CourierDeliveredPage(): React.JSX.Element {
         style={{ flexShrink: 0, position: 'relative', zIndex: 20, overflow: 'visible' }}
       >
         <Group gap="sm" align="flex-end">
+          <TextInput
+            label="Başlangıç Tarihi"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.currentTarget.value)}
+            size="xs"
+            style={{ width: 160 }}
+          />
+          <TextInput
+            label="Bitiş Tarihi"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.currentTarget.value)}
+            size="xs"
+            style={{ width: 160 }}
+          />
           <Box style={{ flex: 1 }}>
             <Text size="xs" fw={600} c="dimmed" mb={4}>
-              Birlik Seçimi
+              Birlik Seçimi (Opsiyonel)
             </Text>
             <UnitTreePicker
               units={units}
@@ -223,26 +271,10 @@ export default function CourierDeliveredPage(): React.JSX.Element {
               singleSelect
             />
           </Box>
-          <TextInput
-            placeholder="Ara..."
-            size="sm"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-            rightSection={
-              searchQuery ? (
-                <ActionIcon size="xs" variant="subtle" onClick={() => setSearchQuery('')}>
-                  <IconX size={12} />
-                </ActionIcon>
-              ) : (
-                <IconSearch size={12} color={theme.colors.gray[5]} />
-              )
-            }
-            style={{ width: 220 }}
-          />
         </Group>
       </Card>
 
-      {/* Tablo kartı */}
+      {/* Senet listesi kartı */}
       <Card
         withBorder
         shadow="sm"
@@ -259,14 +291,30 @@ export default function CourierDeliveredPage(): React.JSX.Element {
         <Group justify="space-between" mb="xs">
           <Group gap="xs">
             <Text fw={700} size="sm" tt="uppercase">
-              TESLİM EDİLEN EVRAKLAR
+              TESLİM EDİLEN SENETLER
             </Text>
-            {filteredList.length > 0 && (
-              <Badge variant="light" color="teal" size="sm">
-                {filteredList.length} kayıt
-              </Badge>
+            {totalReceipts > 0 && (
+              <>
+                <Badge variant="light" color="teal" size="sm">
+                  {totalReceipts} senet
+                </Badge>
+                <Badge variant="light" color="gray" size="sm">
+                  {totalDocs} evrak
+                </Badge>
+              </>
             )}
           </Group>
+          {receiptGroups.length > 0 && (
+            <Text
+              size="xs"
+              c="teal"
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={toggleAll}
+              fw={600}
+            >
+              {allExpanded ? 'Tümünü Kapat' : 'Tümünü Aç'}
+            </Text>
+          )}
         </Group>
 
         <Box style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -274,150 +322,153 @@ export default function CourierDeliveredPage(): React.JSX.Element {
             <Text size="sm" c="dimmed" ta="center" py="xl">
               Yükleniyor...
             </Text>
-          ) : filteredList.length === 0 ? (
+          ) : receiptGroups.length === 0 ? (
             <Text size="sm" c="dimmed" ta="center" py="xl">
-              {deliveredList.length === 0
-                ? 'Henüz teslim edilen kurye evrakı bulunmuyor.'
-                : 'Aramanızla eşleşen kayıt bulunamadı.'}
+              {dateFrom
+                ? 'Seçilen tarih aralığında teslim edilmiş kurye senedi bulunamadı.'
+                : 'Tarih seçerek teslim edilmiş senetleri görüntüleyin.'}
             </Text>
           ) : (
             <ScrollArea h="100%" scrollbarSize={6} type="hover">
-              <Table
-                striped
-                highlightOnHover
-                fz="xs"
-                styles={{
-                  table: { borderCollapse: 'separate', borderSpacing: 0 },
-                  thead: {
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 10,
-                    background:
-                      'linear-gradient(180deg, ' +
-                      theme.colors.teal[4] +
-                      ' 0%, ' +
-                      theme.colors.teal[6] +
-                      ' 50%, ' +
-                      theme.colors.teal[8] +
-                      ' 100%)'
-                  },
-                  th: {
-                    padding: '6px 8px',
-                    fontWeight: 800,
-                    fontSize: '0.68rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    color: theme.colors.teal[0],
-                    background: 'transparent',
-                    borderBottom: 'none',
-                    whiteSpace: 'nowrap'
-                  },
-                  td: {
-                    padding: '5px 8px',
-                    fontSize: '0.72rem'
-                  }
-                }}
-              >
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: 55, borderTopLeftRadius: theme.radius.sm }}>
-                      SENET NO
-                    </Table.Th>
-                    <Table.Th style={{ width: 55 }}>K.NO</Table.Th>
-                    <Table.Th>GÖNDEREN MAKAM</Table.Th>
-                    <Table.Th>SAYISI</Table.Th>
-                    <Table.Th style={{ minWidth: 160 }}>KONUSU</Table.Th>
-                    <Table.Th style={{ width: 80 }}>TARİHİ</Table.Th>
-                    <Table.Th style={{ width: 70 }}>GİZLİLİK</Table.Th>
-                    <Table.Th style={{ width: 80 }}>GÜV.K.NO</Table.Th>
-                    <Table.Th style={{ width: 100 }}>KAYIT TARİHİ</Table.Th>
-                    <Table.Th style={{ width: 100 }}>TESLİM TARİHİ</Table.Th>
-                    <Table.Th
-                      style={{
-                        width: 45,
-                        textAlign: 'center',
-                        borderTopRightRadius: theme.radius.sm
-                      }}
-                    >
-                      YAZDIR
-                    </Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {groupedData.groups.map((group) => (
-                    <React.Fragment key={group.unitName || '__all__'}>
-                      {/* Birlik başlık satırı — Badge ile belirgin */}
-                      {groupedData.showGroupHeaders && group.unitName && (
-                        <Table.Tr>
-                          <Table.Td
-                            colSpan={11}
-                            style={{
-                              background: theme.colors.teal[0],
-                              padding: '6px 8px',
-                              borderBottom: '2px solid ' + theme.colors.teal[3]
+              <Stack gap={0}>
+                {receiptGroups.map((group) => {
+                  const groupKey = String(group.receiptNo ?? 'null')
+                  const isExpanded = expandedGroups.has(groupKey)
+
+                  return (
+                    <Box key={groupKey}>
+                      {/* Senet başlık satırı */}
+                      <Group
+                        gap="xs"
+                        px="sm"
+                        py={6}
+                        style={{
+                          cursor: 'pointer',
+                          borderBottom: `1px solid ${theme.colors.gray[2]}`,
+                          background: isExpanded ? theme.colors.teal[0] : 'transparent',
+                          borderRadius: isExpanded
+                            ? `${theme.radius.sm} ${theme.radius.sm} 0 0`
+                            : theme.radius.sm,
+                          transition: 'background 150ms ease'
+                        }}
+                        onClick={() => toggleGroup(groupKey)}
+                      >
+                        {isExpanded ? (
+                          <IconChevronDown size={16} color={theme.colors.teal[6]} />
+                        ) : (
+                          <IconChevronRight size={16} color={theme.colors.gray[5]} />
+                        )}
+
+                        <Badge variant="filled" color="teal" size="sm" radius="sm" fw={800}>
+                          Senet No: {group.receiptNo ?? '—'}
+                        </Badge>
+
+                        <Badge variant="light" color="blue" size="xs">
+                          {group.unitNames}
+                        </Badge>
+
+                        <Badge variant="light" color="gray" size="xs">
+                          {group.items.length} evrak
+                        </Badge>
+
+                        <Text size="xs" c="dimmed" style={{ marginLeft: 'auto' }}>
+                          {formatDeliveryDate(group.deliveryDate)}
+                        </Text>
+
+                        {group.deliveredByName && (
+                          <Badge variant="light" color="orange" size="xs">
+                            {group.deliveredByName}
+                          </Badge>
+                        )}
+
+                        <ActionIcon
+                          variant="light"
+                          color="teal"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setPrintData(group.items)
+                          }}
+                          title="Bu senete ait tüm belgeleri yazdır"
+                        >
+                          <IconPrinter size={14} />
+                        </ActionIcon>
+                      </Group>
+
+                      {/* Genişletilmiş belge listesi */}
+                      <Collapse in={isExpanded}>
+                        <Box
+                          style={{
+                            borderLeft: `3px solid ${theme.colors.teal[3]}`,
+                            borderRight: `1px solid ${theme.colors.gray[2]}`,
+                            borderBottom: `1px solid ${theme.colors.gray[2]}`,
+                            borderRadius: `0 0 ${theme.radius.sm} ${theme.radius.sm}`,
+                            marginBottom: 4
+                          }}
+                        >
+                          <Table
+                            striped
+                            highlightOnHover
+                            fz="xs"
+                            styles={{
+                              table: { borderCollapse: 'separate', borderSpacing: 0 },
+                              thead: {
+                                background: `linear-gradient(180deg, ${theme.colors.teal[4]} 0%, ${theme.colors.teal[6]} 100%)`
+                              },
+                              th: {
+                                padding: '5px 8px',
+                                fontWeight: 800,
+                                fontSize: '0.65rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                color: theme.colors.teal[0],
+                                background: 'transparent',
+                                borderBottom: 'none',
+                                whiteSpace: 'nowrap'
+                              },
+                              td: {
+                                padding: '4px 8px',
+                                fontSize: '0.7rem'
+                              }
                             }}
                           >
-                            <Group gap="xs">
-                              <Badge
-                                variant="filled"
-                                color="teal"
-                                size="sm"
-                                radius="sm"
-                                styles={{
-                                  root: {
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em',
-                                    fontWeight: 800,
-                                    fontSize: '0.7rem'
-                                  }
-                                }}
-                              >
-                                {group.unitName}
-                              </Badge>
-                              <Badge variant="light" color="teal" size="xs">
-                                {group.items.length} evrak
-                              </Badge>
-                            </Group>
-                          </Table.Td>
-                        </Table.Tr>
-                      )}
-                      {group.items.map((d) => (
-                        <Table.Tr key={d.distribution_id}>
-                          <Table.Td fw={700} style={{ textAlign: 'center' }}>
-                            {d.receipt_no ?? '—'}
-                          </Table.Td>
-                          <Table.Td fw={600}>{d.document_id}</Table.Td>
-                          <Table.Td>{d.source_office}</Table.Td>
-                          <Table.Td>{d.reference_number}</Table.Td>
-                          <Table.Td>{d.subject}</Table.Td>
-                          <Table.Td style={{ textAlign: 'center' }}>
-                            {formatDate(d.document_date)}
-                          </Table.Td>
-                          <Table.Td style={{ textAlign: 'center' }}>
-                            {getClassificationName(d.classification_id)}
-                          </Table.Td>
-                          <Table.Td>{d.security_control_no || '—'}</Table.Td>
-                          <Table.Td>{formatDate(d.record_date)}</Table.Td>
-                          <Table.Td style={{ textAlign: 'center' }}>
-                            {formatDeliveryDate(d.delivery_date)}
-                          </Table.Td>
-                          <Table.Td style={{ textAlign: 'center' }}>
-                            <ActionIcon
-                              variant="light"
-                              color="teal"
-                              size="xs"
-                              onClick={() => setPrintData([d])}
-                              title="Yazdır"
-                            >
-                              <IconPrinter size={14} />
-                            </ActionIcon>
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th style={{ width: 55 }}>K.NO</Table.Th>
+                                <Table.Th>GÖNDEREN MAKAM</Table.Th>
+                                <Table.Th>SAYISI</Table.Th>
+                                <Table.Th style={{ minWidth: 140 }}>KONUSU</Table.Th>
+                                <Table.Th style={{ width: 80 }}>TARİHİ</Table.Th>
+                                <Table.Th style={{ width: 70 }}>GİZLİLİK</Table.Th>
+                                <Table.Th style={{ width: 80 }}>GÜV.K.NO</Table.Th>
+                                <Table.Th style={{ width: 90 }}>KAYIT TARİHİ</Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {group.items.map((d) => (
+                                <Table.Tr key={d.distribution_id}>
+                                  <Table.Td fw={600}>{d.document_id}</Table.Td>
+                                  <Table.Td>{d.source_office}</Table.Td>
+                                  <Table.Td>{d.reference_number}</Table.Td>
+                                  <Table.Td>{d.subject}</Table.Td>
+                                  <Table.Td style={{ textAlign: 'center' }}>
+                                    {formatDate(d.document_date)}
+                                  </Table.Td>
+                                  <Table.Td style={{ textAlign: 'center' }}>
+                                    {getClassificationName(d.classification_id)}
+                                  </Table.Td>
+                                  <Table.Td>{d.security_control_no || '—'}</Table.Td>
+                                  <Table.Td>{formatDate(d.record_date)}</Table.Td>
+                                </Table.Tr>
+                              ))}
+                            </Table.Tbody>
+                          </Table>
+                        </Box>
+                      </Collapse>
+                    </Box>
+                  )
+                })}
+              </Stack>
             </ScrollArea>
           )}
         </Box>

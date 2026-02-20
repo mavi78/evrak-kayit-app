@@ -34,6 +34,7 @@ import type {
   BulkDeliverRequest,
   BulkDeliverResponse,
   DeliveredReceiptInfo,
+  CourierDeliveredListRequest,
   ServiceResponse,
   DocumentScope
 } from '@shared/types'
@@ -182,7 +183,8 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
       'incoming-document:courier-pending': (data) => this.handleCourierPending(data),
       'incoming-document:courier-bulk-deliver': (data) =>
         this.handleCourierBulkDeliver(data as BulkDeliverRequest),
-      'incoming-document:courier-delivered-list': () => this.handleCourierDeliveredList()
+      'incoming-document:courier-delivered-list': (data) =>
+        this.handleCourierDeliveredList(data as CourierDeliveredListRequest)
     }
   }
 
@@ -268,7 +270,11 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     // Kanal senet gerektirmiyorsa otomatik teslim et (Posta kanalı hariç — posta servisi modülünde teslim edilecek)
     const channel = this.channelRepository.findById(channel_id)
     if (channel && !channel.is_senet_required && channel.name.toLowerCase() !== 'posta') {
-      const delivered = this.distributionRepository.markDeliveredWithoutReceipt(item.id)
+      const delivered = this.distributionRepository.markDeliveredWithoutReceipt(
+        item.id,
+        0,
+        'Sistem'
+      )
       return this.created(
         delivered ?? item,
         'Dağıtım eklendi ve teslim edildi (senet gerektirmiyor)'
@@ -335,7 +341,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
         !newChannel.is_senet_required &&
         newChannel.name.toLowerCase() !== 'posta'
       ) {
-        const delivered = this.distributionRepository.markDeliveredWithoutReceipt(id)
+        const delivered = this.distributionRepository.markDeliveredWithoutReceipt(id, 0, 'Sistem')
         return this.ok(delivered, 'Dağıtım güncellendi ve teslim edildi (senet gerektirmiyor)')
       }
     }
@@ -388,14 +394,28 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     const channel = this.channelRepository.findById(existing.channel_id)
     const isSenetRequired = channel?.is_senet_required ?? true
 
+    // Kullanıcı bilgisi (tek teslimde request'te yoksa 0/'Sistem' geçilir)
+    const raw = data as unknown as Record<string, unknown>
+    const userId = raw.delivered_by_user_id as number | undefined
+    const userName = raw.delivered_by_name as string | undefined
+
     if (isSenetRequired) {
       // Atomik senet no üret (exclusive transaction)
       const receiptNo = this.receiptCounterRepository.getNextReceiptNo()
-      const item = this.distributionRepository.markDelivered(id, receiptNo)
+      const item = this.distributionRepository.markDelivered(
+        id,
+        receiptNo,
+        userId ?? 0,
+        userName ?? 'Sistem'
+      )
       return this.ok(item, `Teslim edildi — Senet No: ${receiptNo}`)
     } else {
       // Senet gerektirmeyen kanal — senet no olmadan teslim et
-      const item = this.distributionRepository.markDeliveredWithoutReceipt(id)
+      const item = this.distributionRepository.markDeliveredWithoutReceipt(
+        id,
+        userId ?? 0,
+        userName ?? 'Sistem'
+      )
       return this.ok(item, 'Teslim edildi (senet no gerektirmiyor)')
     }
   }
@@ -423,13 +443,16 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
   private async handleCourierBulkDeliver(
     data: BulkDeliverRequest
   ): Promise<ServiceResponse<BulkDeliverResponse>> {
-    const { distribution_ids } = data
+    const { distribution_ids, delivered_by_user_id, delivered_by_name } = data
     if (!distribution_ids || distribution_ids.length === 0) {
       throw AppError.badRequest('En az bir dağıtım ID belirtilmelidir')
     }
+    if (!delivered_by_user_id || !delivered_by_name) {
+      throw AppError.badRequest('Teslim eden kullanıcı bilgisi zorunludur')
+    }
 
     const delivered: DeliveredReceiptInfo[] = []
-    const failed: Array<{ distribution_id: number; reason: string }> = []
+    const failed: BulkDeliverResponse['failed'] = []
 
     // İlk dağıtımın kanalından senet gerekliliğini kontrol et ve
     // tek senet numarası üret — tüm belgeler aynı numarayı paylaşır
@@ -451,17 +474,35 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
           continue
         }
         if (existing.is_delivered) {
-          failed.push({ distribution_id: distId, reason: 'Zaten teslim edilmiş' })
+          // Çakışma — başka kullanıcı tarafından zaten teslim edilmiş
+          const doc = this.repository.findById(existing.document_id)
+          failed.push({
+            distribution_id: distId,
+            reason: 'Zaten teslim edilmiş',
+            already_delivered_by: existing.delivered_by_name ?? 'Bilinmiyor',
+            already_receipt_no: existing.receipt_no,
+            document_id: existing.document_id,
+            subject: doc?.subject ?? ''
+          })
           continue
         }
 
         let deliveryDate: string
 
         if (sharedReceiptNo !== null) {
-          const result = this.distributionRepository.markDelivered(distId, sharedReceiptNo)
+          const result = this.distributionRepository.markDelivered(
+            distId,
+            sharedReceiptNo,
+            delivered_by_user_id,
+            delivered_by_name
+          )
           deliveryDate = result?.delivery_date ?? ''
         } else {
-          const result = this.distributionRepository.markDeliveredWithoutReceipt(distId)
+          const result = this.distributionRepository.markDeliveredWithoutReceipt(
+            distId,
+            delivered_by_user_id,
+            delivered_by_name
+          )
           deliveryDate = result?.delivery_date ?? ''
         }
 
@@ -484,7 +525,8 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
           security_control_no: doc?.security_control_no ?? '',
           unit_name: unit?.short_name ?? unit?.name ?? String(existing.unit_id),
           attachment_count: doc?.attachment_count ?? 0,
-          page_count: doc?.page_count ?? 0
+          page_count: doc?.page_count ?? 0,
+          delivered_by_name
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
@@ -496,9 +538,19 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     return this.ok({ delivered, failed }, msg)
   }
 
-  /** Teslim edilmiş kurye dağıtımlarını getir (geçmiş listesi) */
-  private async handleCourierDeliveredList(): Promise<ServiceResponse<DeliveredReceiptInfo[]>> {
-    const list = this.distributionRepository.findDeliveredCourier()
+  /** Teslim edilmiş kurye dağıtımlarını getir (filtreleme destekli) */
+  private async handleCourierDeliveredList(
+    data: CourierDeliveredListRequest
+  ): Promise<ServiceResponse<DeliveredReceiptInfo[]>> {
+    const { date_from, date_to, unit_ids } = data
+    if (!date_from || !date_to) {
+      throw AppError.badRequest('Tarih aralığı zorunludur')
+    }
+    const list = this.distributionRepository.findDeliveredCourier(
+      date_from,
+      date_to,
+      unit_ids && unit_ids.length > 0 ? unit_ids : undefined
+    )
     return this.ok(
       list,
       list.length > 0

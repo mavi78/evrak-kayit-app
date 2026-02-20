@@ -7,6 +7,7 @@
 //    - Alt birlikleri (rekürsif) varsa birlik adıyla gruplandırılır
 // 3. Toplu / tekli seçim → "Teslim Et ve Yazdır"
 // 4. Başarılı teslim → ReceiptPrintView modal açılır
+// 5. Çakışma kontrolü — başka kullanıcı teslim ettiyse uyarı
 // ============================================================
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
@@ -22,9 +23,11 @@ import {
   Checkbox,
   Badge,
   ScrollArea,
+  Modal,
   useMantineTheme
 } from '@mantine/core'
-import { IconPrinter, IconCheck } from '@tabler/icons-react'
+import { IconPrinter, IconCheck, IconAlertTriangle } from '@tabler/icons-react'
+import { useAuth } from '@renderer/hooks/useAuth'
 import { UnitTreePicker } from '@renderer/components/common'
 import { incomingDocumentApi, unitApi, classificationApi } from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
@@ -33,7 +36,8 @@ import type {
   Unit,
   Classification,
   CourierPendingDistribution,
-  DeliveredReceiptInfo
+  DeliveredReceiptInfo,
+  BulkDeliverResponse
 } from '@shared/types'
 
 const PAGE_DESCRIPTION =
@@ -52,6 +56,7 @@ function formatDate(dateStr: string): string {
 
 export default function CourierNotDeliveredPage(): React.JSX.Element {
   const theme = useMantineTheme()
+  const { state: authState } = useAuth()
 
   // Birim ve sınıflandırma verileri
   const [units, setUnits] = useState<Unit[]>([])
@@ -73,6 +78,13 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
 
   // Senet yazdırma
   const [printData, setPrintData] = useState<DeliveredReceiptInfo[] | null>(null)
+
+  // Çakışma modalı state'leri
+  const [conflictModalOpen, setConflictModalOpen] = useState(false)
+  const [conflictData, setConflictData] = useState<{
+    delivered: DeliveredReceiptInfo[]
+    failed: BulkDeliverResponse['failed']
+  } | null>(null)
 
   // Referans verileri yükle
   useEffect(() => {
@@ -176,31 +188,81 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     })
   }, [])
 
+  // Listeyi yenile (birlik seçimine göre tekrar çek)
+  const refreshList = useCallback(() => {
+    if (resolvedUnitIds.length === 0) return
+    setLoading(true)
+    setSelectedDistIds(new Set())
+    incomingDocumentApi
+      .courierPending(resolvedUnitIds)
+      .then((res) => {
+        if (res.success) {
+          setPendingList(res.data)
+        } else {
+          showError(res.message)
+          setPendingList([])
+        }
+      })
+      .catch(() => {
+        showError('Veri yüklenirken bir hata oluştu')
+        setPendingList([])
+      })
+      .finally(() => setLoading(false))
+  }, [resolvedUnitIds])
+
   // Teslim et
   const handleDeliver = useCallback(async () => {
     if (selectedDistIds.size === 0) {
       showError('Teslim edilecek en az bir evrak seçin')
       return
     }
+    if (!authState.user) {
+      showError('Oturum bilgisi bulunamadı')
+      return
+    }
     setDelivering(true)
     try {
       const res = await incomingDocumentApi.courierBulkDeliver({
-        distribution_ids: Array.from(selectedDistIds)
+        distribution_ids: Array.from(selectedDistIds),
+        delivered_by_user_id: authState.user.id,
+        delivered_by_name: authState.user.full_name
       })
       if (res.success && res.data) {
         const { delivered, failed } = res.data
-        if (delivered.length > 0) {
-          showSuccess(`${delivered.length} evrak teslim edildi`)
-          // Senet yazdırma verisi hazırla
-          setPrintData(delivered)
-          // Teslim edilen dağıtımları listeden çıkar
+
+        // Sadece "Zaten teslim edilmiş" çakışma kayıtlarını filtrele
+        const conflicts = failed.filter((f) => f.already_delivered_by)
+
+        if (delivered.length === 0 && conflicts.length > 0) {
+          // Senaryo A: Tümü zaten teslim edilmiş
+          showError(
+            'Seçtiğiniz tüm evraklar başka bir kullanıcı tarafından zaten teslim edilmiş. Sayfa yenileniyor...'
+          )
+          refreshList()
+        } else if (delivered.length > 0 && conflicts.length > 0) {
+          // Senaryo B: Kısmen teslim edilmiş — çakışma uyarı modalı
+          setConflictData({ delivered, failed: conflicts })
+          setConflictModalOpen(true)
+          // Teslim edilen dağıtımları listeden çıkar (henüz yazdırma yok — modal sonucuna göre)
           setPendingList((prev) =>
             prev.filter((d) => !delivered.some((del) => del.distribution_id === d.distribution_id))
           )
           setSelectedDistIds(new Set())
-        }
-        if (failed.length > 0) {
-          showError(`${failed.length} evrak teslim edilemedi`)
+        } else {
+          // Senaryo C: Çakışma yok — mevcut davranış
+          if (delivered.length > 0) {
+            showSuccess(`${delivered.length} evrak teslim edildi`)
+            setPrintData(delivered)
+            setPendingList((prev) =>
+              prev.filter(
+                (d) => !delivered.some((del) => del.distribution_id === d.distribution_id)
+              )
+            )
+            setSelectedDistIds(new Set())
+          }
+          if (failed.length > 0) {
+            showError(`${failed.length} evrak teslim edilemedi`)
+          }
         }
       } else {
         showError(res.message)
@@ -210,7 +272,27 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     } finally {
       setDelivering(false)
     }
-  }, [selectedDistIds])
+  }, [selectedDistIds, authState.user, refreshList])
+
+  // Çakışma modalı: Kabul Et
+  const handleConflictAccept = useCallback(() => {
+    if (conflictData) {
+      showSuccess(`${conflictData.delivered.length} evrak teslim edildi`)
+      setPrintData(conflictData.delivered)
+      // Çakışan dağıtımları da listeden çıkar
+      const conflictDistIds = new Set(conflictData.failed.map((f) => f.distribution_id))
+      setPendingList((prev) => prev.filter((d) => !conflictDistIds.has(d.distribution_id)))
+    }
+    setConflictModalOpen(false)
+    setConflictData(null)
+  }, [conflictData])
+
+  // Çakışma modalı: Reddet
+  const handleConflictReject = useCallback(() => {
+    setConflictModalOpen(false)
+    setConflictData(null)
+    refreshList()
+  }, [refreshList])
 
   // Yardımcılar
 
@@ -517,6 +599,79 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
           onClose={() => setPrintData(null)}
         />
       )}
+
+      {/* Çakışma uyarı modalı */}
+      <Modal
+        opened={conflictModalOpen}
+        onClose={() => {
+          setConflictModalOpen(false)
+          setConflictData(null)
+          refreshList()
+        }}
+        title={
+          <Group gap="xs">
+            <IconAlertTriangle size={20} color={theme.colors.yellow[6]} />
+            <Text fw={700} size="sm">
+              Çakışma Uyarısı
+            </Text>
+          </Group>
+        }
+        size="lg"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Aşağıdaki evraklar, <strong>başka bir kullanıcı tarafından zaten teslim edilmiş</strong>
+            . Bu evraklar senedinize dahil edilemez:
+          </Text>
+
+          <ScrollArea.Autosize mah={250}>
+            <Table striped highlightOnHover fz="xs">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>K.No</Table.Th>
+                  <Table.Th>Konusu</Table.Th>
+                  <Table.Th>Teslim Eden</Table.Th>
+                  <Table.Th>Senet No</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {conflictData?.failed.map((f) => (
+                  <Table.Tr key={f.distribution_id}>
+                    <Table.Td fw={600}>{f.document_id ?? '—'}</Table.Td>
+                    <Table.Td>{f.subject ?? '—'}</Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" color="orange" size="sm">
+                        {f.already_delivered_by ?? 'Bilinmiyor'}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>{f.already_receipt_no ?? '—'}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea.Autosize>
+
+          {conflictData && conflictData.delivered.length > 0 && (
+            <Text size="sm" c="dimmed">
+              Kalan <strong>{conflictData.delivered.length}</strong> evrak başarıyla teslim
+              edilmiştir. Kabul ederseniz bu evraklar için senet yazdırılacak, reddetmeniz halinde
+              sayfa yenilenecektir.
+            </Text>
+          )}
+
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={handleConflictReject} size="sm">
+              Reddet — Sayfayı Yenile
+            </Button>
+            {conflictData && conflictData.delivered.length > 0 && (
+              <Button color="teal" onClick={handleConflictAccept} size="sm">
+                Kabul Et — Senet Yazdır ({conflictData.delivered.length})
+              </Button>
+            )}
+          </Group>
+        </Stack>
+      </Modal>
     </Box>
   )
 }

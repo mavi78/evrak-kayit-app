@@ -114,7 +114,7 @@ export default function PageManagementPage(): React.JSX.Element {
       setRoleVisibilityData(defaultsRes.data)
     }
     setLoadingRoleVisibility(false)
-  }, [canManageRoleVisibility, currentUser, isAdmin, isSuperadmin, roleVisibilityTarget])
+  }, [canManageRoleVisibility, currentUser, isAdmin, roleVisibilityTarget])
 
   useEffect(() => {
     if (canManageRoleVisibility) {
