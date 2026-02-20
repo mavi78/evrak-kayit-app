@@ -48,18 +48,13 @@ Kullanıcı ile **her zaman Türkçe** konuşulacak. Kod içi isimler İngilizce
 
 Bir kodlama isteği geldiğinde şu adımlar izlenecek:
 
-1. **Ön Akış — prompt-enhancer (Zorunlu)**: `.agent/skills/prompt-enhancer/SKILL.md` okunur ve aşağıdaki akış **otomatik** uygulanır. Kullanıcının tetiklemesine gerek yoktur:
-   - **Netleştirme**: İstek soru-cevap / öneri ile netleştirilir. Belirsizlik kalmayana kadar bu adımda kalınır.
-   - **Proje Analizi**: Mevcut kod tabanı ve ilgili dosyalar incelenir.
-   - **Uygulama Planı**: Netleşen istek + analiz sonuçları birleştirilerek detaylı plan oluşturulur.
-   - **Onay**: Plan sunulup kodlamaya başlamak için kullanıcıdan onay alınır.
-2. **Kodlama Skill'leri (Zorunlu — Bağımlılık Sırasıyla)**: Onay alındıktan sonra etkilenen her katmanın skill'i **bağımlılık sırasıyla** okunup uygulanır:
+1. **Kodlama Skill'leri (Zorunlu — Bağımlılık Sırasıyla)**: Etkilenen her katmanın skill'i **bağımlılık sırasıyla** okunup uygulanır:
    - `shared-contracts` → `backend-architecture` → `frontend-architecture` → `ui-ux-pro-max`
    - Sadece etkilenen katmanların skill'leri okunur; etkilenmeyen katman atlanır.
    - Her katman kodlanmadan önce o katmanın skill'i **Read** ile okunur.
    - Detaylar: `always-use-skills-and-rules.md` > Çoklu Katman Zincirleme bölümü.
-3. **Uygulama**: İlgili skill'lerin akışına göre, katman bağımlılık sırasıyla kodlama yapılır.
-4. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
+2. **Uygulama**: İlgili skill'lerin akışına göre, katman bağımlılık sırasıyla kodlama yapılır.
+3. **Doğrulama (Zorunlu)**: Kod değişiklikleri tamamlandıktan sonra aşağıdaki kontroller **mutlaka** yapılacak:
    - **TypeCheck**: `npm run typecheck` komutu çalıştırılarak tip hataları kontrol edilecek. (Proje iki tsconfig kullanır: `tsconfig.node.json` — Main/Preload/Shared, `tsconfig.web.json` — Renderer/Shared. Tek `npx tsc --noEmit` çalışmaz.)
    - **Lint**: `npm run lint` komutu çalıştırılarak lint hataları kontrol edilecek.
    - Hata bulunursa düzeltilmeden işlem tamamlanmış sayılmayacak.
@@ -71,6 +66,4 @@ Bir kodlama isteği geldiğinde şu adımlar izlenecek:
   - Onay işlemleri için Mantine `Modal` bileşeni veya `@mantine/modals` kullanılır.
   - Tarayıcı native diyalogları, uygulamanın native hissini bozar ve renderer process'i bloklar.
 
-> **Not:** Genel sorular (teorik bilgi, açıklama isteme), git işlemleri ve skill/kural düzenlemelerinde ön akış **atlanır**; doğrudan ilgili akışa geçilir.
-
-Belirsiz veya birden fazla yaklaşım mümkünse, AskQuestion ile seçenekler sunulacak.
+Belirsiz veya birden fazla yaklaşım mümkünse, kullanıcıya seçenekler sunulacak.

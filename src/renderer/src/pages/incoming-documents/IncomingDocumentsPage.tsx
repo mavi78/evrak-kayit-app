@@ -34,7 +34,8 @@ import type {
 
 const PAGE_DESCRIPTION =
   'Gelen evrakları listeleyebilir, arayabilir ve yeni evrak kaydı oluşturabilirsiniz. ' +
-  'Satıra tıklayarak evrakın havale/dağıtım bilgilerini görebilirsiniz.'
+  'Satıra tıklayarak dağıtım bilgilerini, çift tıklayarak düzenleme formunu, ' +
+  'sağ tıklayarak havale/dağıtım işlemlerini başlatabilirsiniz.'
 
 export default function IncomingDocumentsPage(): React.JSX.Element {
   const [list, setList] = useState<IncomingDocument[]>([])
@@ -351,7 +352,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
         <Title order={3} style={{ margin: 0 }}>
           Gelen Evrak
         </Title>
-        <Text size="sm" c="dimmed" style={{ maxWidth: 560 }}>
+        <Text size="sm" c="dimmed">
           {PAGE_DESCRIPTION}
         </Text>
       </Stack>

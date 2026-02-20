@@ -14,40 +14,32 @@
 
 ## Skill Türleri
 
-Skill'ler üç kategoriye ayrılır; her kategorinin uygulama akışı farklıdır:
+Skill'ler iki kategoriye ayrılır; her kategorinin uygulama akışı farklıdır:
 
-| Kategori               | Skill'ler                                                                            | Akış                                                                                                                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Ön Akış Skill'i**    | `prompt-enhancer`                                                                    | Her kodlama isteğinde **otomatik**: İsteği al → Netleştir (soru-cevap) → Proje analizi → Plan oluştur → Onay al → Kodlama skill'leri ile implementasyona geç → TypeCheck + Lint |
-| **Kodlama Skill'leri** | `ui-ux-pro-max`, `backend-architecture`, `frontend-architecture`, `shared-contracts` | **prompt-enhancer ön akışından sonra** uygulanır: Skill oku → Kod yaz → TypeCheck + Lint                                                                                        |
-| **Meta Skill'ler**     | `github-turkish-commit`                                                              | Skill oku → Skill'in kendi iş akışını uygula → Çıktı sun                                                                                                                        |
+| Kategori               | Skill'ler                                                           | Akış                                                     |
+| ---------------------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Kodlama Skill'leri** | `backend-architecture`, `frontend-architecture`, `shared-contracts` | Skill oku → Kod yaz → TypeCheck + Lint                   |
+| **Meta Skill'ler**     | `github-turkish-commit`                                             | Skill oku → Skill'in kendi iş akışını uygula → Çıktı sun |
 
 ## İş Türüne Göre Skill Kullanımı
 
-| İş türü                                | Kullanılacak skill      | Ne zaman                                                                                                                                                                                                |
-| -------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UI/UX, tasarım, splash, sayfa görünümü | `ui-ux-pro-max`         | İşe başlamadan önce skill okunacak; UI işi varsa design-system/UX kuralları uygulanacak.                                                                                                                |
-| Main process, servis, repository, DB   | `backend-architecture`  | Backend kodu yazmadan önce skill okunacak; mimari kalıplara uyulacak.                                                                                                                                   |
-| React, sayfa, context, router          | `frontend-architecture` | Frontend kodu yazmadan önce skill okunacak; sayfa/hook/API kalıpları uygulanacak.                                                                                                                       |
-| IPC, preload, shared tipler            | `shared-contracts`      | Kanal/tipler tanımlanırken skill okunacak.                                                                                                                                                              |
-| Her kodlama isteği (ön akış)           | `prompt-enhancer`       | Kodlama isteği geldiğinde **otomatik** uygulanır. İsteği netleştirir, projeyi analiz eder, plan oluşturur ve onay ister. Genel sorularda, git işlemlerinde ve skill/kural düzenlemelerinde **atlanır**. |
-| Git, commit, push, GitHub              | `github-turkish-commit` | Kod GitHub'a yüklenirken skill okunacak; kendi iş akışı uygulanacak.                                                                                                                                    |
+| İş türü                              | Kullanılacak skill      | Ne zaman                                                                          |
+| ------------------------------------ | ----------------------- | --------------------------------------------------------------------------------- |
+| Main process, servis, repository, DB | `backend-architecture`  | Backend kodu yazmadan önce skill okunacak; mimari kalıplara uyulacak.             |
+| React, sayfa, context, router        | `frontend-architecture` | Frontend kodu yazmadan önce skill okunacak; sayfa/hook/API kalıpları uygulanacak. |
+| IPC, preload, shared tipler          | `shared-contracts`      | Kanal/tipler tanımlanırken skill okunacak.                                        |
+| Git, commit, push, GitHub            | `github-turkish-commit` | Kod GitHub'a yüklenirken skill okunacak; kendi iş akışı uygulanacak.              |
 
 ## Uygulama Sırası
 
 1. İsteği oku → Hangi alan olduğunu ve hangi skill kategorisine girdiğini belirle.
 2. **Önce** ilgili skill dosyasını (`SKILL.md`) oku; skill'de yazılan akışa göre ilerle.
 
-### A) Kodlama İsteği → Ön Akış (prompt-enhancer) + Kodlama Skill'leri
+### A) Kodlama İsteği → Kodlama Skill'leri
 
-3. **Önce** `prompt-enhancer` ön akışını uygula:
-   - İsteği netleştir (soru-cevap / öneri).
-   - Projeyi analiz et.
-   - Uygulama planı oluştur ve kullanıcıya sun.
-   - Kodlamaya geçiş onayı al.
-4. Onay alındıktan sonra → **Çoklu Katman Zincirleme** kuralına göre ilgili skill'leri sırasıyla oku ve uygula (aşağıdaki bölüme bak).
-5. `.agent/rules/` (project-coding-standards, ilgili strict kurallar) ile uyumlu kod yaz.
-6. Doğrulama: TypeCheck ve Lint mutlaka çalıştır.
+3. **Çoklu Katman Zincirleme** kuralına göre ilgili skill'leri sırasıyla oku ve uygula (aşağıdaki bölüme bak).
+4. `.agent/rules/` (project-coding-standards, ilgili strict kurallar) ile uyumlu kod yaz.
+5. Doğrulama: TypeCheck ve Lint mutlaka çalıştır.
 
 ### B) Meta Skill'ler (github-turkish-commit vb.)
 
@@ -90,4 +82,4 @@ Bir özellik birden fazla katmanı etkiliyorsa (örn. yeni modül: shared + back
 
 - "Kullanıcı söylemediği için skill/kural kullanmadım" **kabul edilmez**.
 - Skill veya kuralı yalnızca kullanıcı açıkça istediğinde devreye sokmak **yasaktır**; varsayılan davranış her zaman uyumdur.
-- Saf meta skill'lere kodlama doğrulaması (TypeCheck/Lint) uygulamak **yasaktır** — gereksiz token israfıdır. Ön akış skill'i (`prompt-enhancer`) implementasyon aşamasına geçtiğinde TypeCheck/Lint **zorunludur**.
+- Saf meta skill'lere kodlama doğrulaması (TypeCheck/Lint) uygulamak **yasaktır** — gereksiz token israfıdır. Kodlama skill'leri ile implementasyon yapıldığında TypeCheck/Lint **zorunludur**.
