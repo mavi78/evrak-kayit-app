@@ -16,8 +16,10 @@ import {
   Stack,
   Button,
   Loader,
-  Center
+  Center,
+  Autocomplete
 } from '@mantine/core'
+import { useDebouncedValue } from '@mantine/hooks'
 import { IconDeviceFloppy, IconTrash } from '@tabler/icons-react'
 import {
   channelApi,
@@ -26,7 +28,10 @@ import {
   folderApi,
   incomingDocumentApi,
   outgoingDocumentApi,
-  transitDocumentApi
+  transitDocumentApi,
+  appSettingsApi,
+  unitApi,
+  autocompleteApi
 } from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
 import { useConfirmModal } from '@renderer/hooks/useConfirmModal'
@@ -159,10 +164,39 @@ export function DocumentFormModal({
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [pendingClassificationId, setPendingClassificationId] = useState<string | null>(null)
 
+  // Autocomplete state
+  const [sourceOfficeSuggestions, setSourceOfficeSuggestions] = useState<string[]>([])
+  const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([])
+  const [debouncedSourceOffice] = useDebouncedValue(form.sourceOffice, 300)
+  const [debouncedSubject] = useDebouncedValue(form.subject, 300)
+
   /** Form alanını güncelle */
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }, [])
+
+  /** Autocomplete istekleri */
+  useEffect(() => {
+    if (debouncedSourceOffice && debouncedSourceOffice.length >= 3) {
+      autocompleteApi
+        .search({ field: 'source_office', query: debouncedSourceOffice })
+        .then((res) => {
+          if (res.success) setSourceOfficeSuggestions(res.data)
+        })
+    } else {
+      setTimeout(() => setSourceOfficeSuggestions([]), 0)
+    }
+  }, [debouncedSourceOffice])
+
+  useEffect(() => {
+    if (debouncedSubject && debouncedSubject.length >= 3) {
+      autocompleteApi.search({ field: 'subject', query: debouncedSubject }).then((res) => {
+        if (res.success) setSubjectSuggestions(res.data)
+      })
+    } else {
+      setTimeout(() => setSubjectSuggestions([]), 0)
+    }
+  }, [debouncedSubject])
 
   /** Modal açıldığında lookup verileri çek ve formu doldur */
   useEffect(() => {
@@ -224,6 +258,18 @@ export function DocumentFormModal({
         // Varsayılan değerler
         newForm.pageCount = 1
         newForm.attachmentCount = 0
+
+        // GİDEN sayfasında ayarladaki birlik adını Gel.Makam (Gön.Makam) olarak doldur
+        if (scope === 'OUTGOING') {
+          const orgRes = await appSettingsApi.getOrganization()
+          if (orgRes.success && orgRes.data?.value) {
+            const orgUnitId = Number(orgRes.data.value)
+            const unitRes = await unitApi.getById(orgUnitId)
+            if (unitRes.success && unitRes.data) {
+              newForm.sourceOffice = unitRes.data.short_name || unitRes.data.name
+            }
+          }
+        }
       }
 
       // Lookup verileri state'e kaydet
@@ -245,7 +291,7 @@ export function DocumentFormModal({
     }
 
     void loadData()
-  }, [opened, editingDocument, isEditMode])
+  }, [opened, editingDocument, isEditMode, scope])
 
   /** Seçili gizlilik derecesi güvenlik kontrol no gerektiriyor mu? */
   const selectedClassification = classifications.find((c) => c.id === Number(form.classificationId))
@@ -285,11 +331,18 @@ export function DocumentFormModal({
       showError('Sayısı alanı zorunludur')
       return
     }
-    if (!form.documentDateInput.trim()) {
-      showError('Tarihi alanı zorunludur')
-      return
+
+    let dateInput = form.documentDateInput.trim()
+    if (!dateInput) {
+      const now = new Date()
+      const day = String(now.getDate()).padStart(2, '0')
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const year = now.getFullYear()
+      dateInput = `${day}.${month}.${year}`
+      setField('documentDateInput', dateInput)
     }
-    const dateValidation = validateDocumentDate(form.documentDateInput.trim())
+
+    const dateValidation = validateDocumentDate(dateInput)
     if (!dateValidation.valid) {
       showError(dateValidation.message || 'Tarih hatası')
       return
@@ -327,7 +380,7 @@ export function DocumentFormModal({
     let res
 
     // Gerçek tarihi (ISO formatlı) hesapla
-    const isoDate = convertDocumentDateToIso(form.documentDateInput.trim())
+    const isoDate = convertDocumentDateToIso(dateInput)
 
     const api = SCOPE_API[scope]
 
@@ -339,7 +392,7 @@ export function DocumentFormModal({
         source_office: form.sourceOffice.trim(),
         reference_number: form.referenceNumber.trim(),
         subject: form.subject.trim(),
-        document_date_input: form.documentDateInput.trim(),
+        document_date_input: dateInput,
         document_date: isoDate || undefined,
         classification_id: Number(form.classificationId),
         security_control_no: isSecurityNoDisabled ? null : form.securityControlNo.trim() || null,
@@ -355,7 +408,7 @@ export function DocumentFormModal({
         source_office: form.sourceOffice.trim(),
         reference_number: form.referenceNumber.trim(),
         subject: form.subject.trim(),
-        document_date_input: form.documentDateInput.trim(),
+        document_date_input: dateInput,
         document_date: isoDate || undefined,
         classification_id: Number(form.classificationId),
         security_control_no: isSecurityNoDisabled ? null : form.securityControlNo.trim() || null,
@@ -371,6 +424,17 @@ export function DocumentFormModal({
 
     if (res.success) {
       showSuccess(isEditMode ? 'Evrak güncellendi' : 'Evrak kaydedildi')
+
+      // Kayıt başarılıysa autocomplete cache'ine ekle
+      if (form.sourceOffice.trim()) {
+        autocompleteApi
+          .add({ field: 'source_office', value: form.sourceOffice.trim() })
+          .catch(console.error)
+      }
+      if (form.subject.trim()) {
+        autocompleteApi.add({ field: 'subject', value: form.subject.trim() }).catch(console.error)
+      }
+
       handleAfterSave()
     } else {
       showError(res.message)
@@ -671,13 +735,14 @@ export function DocumentFormModal({
                       display: 'block'
                     }}
                   >
-                    Gel.Makam: *
+                    {scope === 'OUTGOING' ? 'Gön.Makam: *' : 'Gel.Makam: *'}
                   </Text>
-                  <TextInput
+                  <Autocomplete
                     size="xs"
                     placeholder="Makam adı"
                     value={form.sourceOffice}
-                    onChange={(e) => setField('sourceOffice', e.currentTarget.value)}
+                    data={sourceOfficeSuggestions}
+                    onChange={(v) => setField('sourceOffice', v)}
                     required
                     style={{ flex: 1 }}
                     styles={{
@@ -687,6 +752,23 @@ export function DocumentFormModal({
                         '&:focus': {
                           borderColor: 'var(--mantine-color-deniz-6)',
                           boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                        }
+                      },
+                      dropdown: {
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                        border: '1px solid var(--mantine-color-gray-3)',
+                        borderRadius: '8px',
+                        padding: '4px',
+                        backdropFilter: 'blur(8px)',
+                        background: 'var(--mantine-color-white)'
+                      },
+                      option: {
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        transition: 'background 150ms ease',
+                        '&[data-combobox-selected]': {
+                          backgroundColor: 'var(--mantine-color-deniz-1)',
+                          color: 'var(--mantine-color-deniz-9)'
                         }
                       }
                     }}
@@ -749,6 +831,15 @@ export function DocumentFormModal({
                       placeholder="GG.AA.YYYY"
                       value={form.documentDateInput}
                       onChange={(e) => setField('documentDateInput', e.currentTarget.value)}
+                      onBlur={() => {
+                        if (!form.documentDateInput.trim()) {
+                          const now = new Date()
+                          const day = String(now.getDate()).padStart(2, '0')
+                          const month = String(now.getMonth() + 1).padStart(2, '0')
+                          const year = now.getFullYear()
+                          setField('documentDateInput', `${day}.${month}.${year}`)
+                        }
+                      }}
                       required
                       maxLength={20}
                       style={{ width: '130px', flexShrink: 0 }}
@@ -782,11 +873,12 @@ export function DocumentFormModal({
                   >
                     Konusu: *
                   </Text>
-                  <TextInput
+                  <Autocomplete
                     size="xs"
                     placeholder="Evrak konusu"
+                    data={subjectSuggestions}
                     value={form.subject}
-                    onChange={(e) => setField('subject', e.currentTarget.value)}
+                    onChange={(v) => setField('subject', v)}
                     required
                     style={{ flex: 1 }}
                     styles={{
@@ -796,6 +888,23 @@ export function DocumentFormModal({
                         '&:focus': {
                           borderColor: 'var(--mantine-color-deniz-6)',
                           boxShadow: '0 0 0 2px var(--mantine-color-deniz-1)'
+                        }
+                      },
+                      dropdown: {
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                        border: '1px solid var(--mantine-color-gray-3)',
+                        borderRadius: '8px',
+                        padding: '4px',
+                        backdropFilter: 'blur(8px)',
+                        background: 'var(--mantine-color-white)'
+                      },
+                      option: {
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        transition: 'background 150ms ease',
+                        '&[data-combobox-selected]': {
+                          backgroundColor: 'var(--mantine-color-deniz-1)',
+                          color: 'var(--mantine-color-deniz-9)'
                         }
                       }
                     }}

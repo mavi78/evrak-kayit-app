@@ -31,6 +31,7 @@ import { TransitDocumentService } from './modules/transit-document/transit-docum
 import { AppSettingsService } from './modules/app-settings/app-settings.service'
 import { PostalStampService } from './modules/postal-stamp/postal-stamp.service'
 import { PostalEnvelopeService } from './modules/postal-envelope/postal-envelope.service'
+import { AutocompleteService } from './modules/autocomplete/autocomplete.service'
 
 import type { LoadingProgressPayload } from '@shared/types'
 
@@ -97,6 +98,7 @@ async function runBackendInit(splashWindow: BrowserWindow): Promise<ServiceManag
   serviceManager.register(new AppSettingsService())
   serviceManager.register(new PostalStampService())
   serviceManager.register(new PostalEnvelopeService())
+  serviceManager.register(new AutocompleteService())
   serviceManager.initialize((moduleName) => {
     sendProgress(splashWindow, {
       step: 'service',

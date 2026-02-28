@@ -417,6 +417,18 @@ export const transitDocumentApi = {
 }
 
 // ============================================================
+// AUTOCOMPLETE API
+// ============================================================
+
+export const autocompleteApi = {
+  search: (data: { field: string; query: string }): Promise<ServiceResponse<string[]>> =>
+    invoke<string[]>('autocomplete:search', data),
+
+  add: (data: { field: string; value: string }): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('autocomplete:add', data)
+}
+
+// ============================================================
 // UYGULAMA AYARLARI API
 // ============================================================
 
