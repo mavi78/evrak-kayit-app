@@ -20,14 +20,25 @@ import {
   ActionIcon,
   Collapse,
   TextInput,
+  LoadingOverlay,
   useMantineTheme
 } from '@mantine/core'
 import { IconPrinter, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
-import { incomingDocumentApi, unitApi, classificationApi } from '@renderer/lib/api'
+import {
+  incomingDocumentApi,
+  outgoingDocumentApi,
+  transitDocumentApi,
+  unitApi,
+  classificationApi
+} from '@renderer/lib/api'
 import { showError } from '@renderer/lib/notifications'
 import { ReceiptPrintView } from '@renderer/components/common/ReceiptPrintView/ReceiptPrintView'
 import { UnitTreePicker } from '@renderer/components/common'
 import type { DeliveredReceiptInfo, Classification, Unit } from '@shared/types'
+
+const PAGE_DESCRIPTION =
+  'Gelen, Giden ve Transit evraklara ait, kurye kanalıyla teslim edilmiş belgeleri senet numarası bazlı listeleyin ve ' +
+  'tekrar yazdırın.'
 
 /** Tarih formatlama: YYYY-MM-DD → DD.MM.YYYY */
 function formatDate(dateStr: string): string {
@@ -62,6 +73,47 @@ function getUniqueUnitNames(items: DeliveredReceiptInfo[]): string {
   return Array.from(names).join(', ')
 }
 
+/**
+ * Senet yazdırma için birlik adı belirle:
+ * - Tüm unit_id'ler aynıysa → o birliğin kısa adı
+ * - Farklıysa → ortak üst birlik (LCA) adı
+ */
+function resolveReceiptUnitName(items: DeliveredReceiptInfo[], units: Unit[]): string {
+  if (items.length === 0) return ''
+  const unitIds = [...new Set(items.map((i) => i.unit_id))]
+  if (unitIds.length === 1) {
+    const u = units.find((x) => x.id === unitIds[0])
+    return u?.short_name || u?.name || items[0].unit_name || ''
+  }
+  // Ortak üst birlik bul (LCA — Lowest Common Ancestor)
+  function getAncestorPath(uid: number): number[] {
+    const path: number[] = []
+    let current: number | null = uid
+    while (current != null) {
+      path.unshift(current)
+      const unit = units.find((u) => u.id === current)
+      if (!unit?.parent_id) break
+      current = unit.parent_id
+    }
+    return path
+  }
+  const paths = unitIds.map((id) => getAncestorPath(id))
+  let lcaId: number | null = null
+  const minLen = Math.min(...paths.map((p) => p.length))
+  for (let i = 0; i < minLen; i++) {
+    if (paths.every((p) => p[i] === paths[0][i])) {
+      lcaId = paths[0][i]
+    } else {
+      break
+    }
+  }
+  if (lcaId != null) {
+    const u = units.find((x) => x.id === lcaId)
+    return u?.short_name || u?.name || ''
+  }
+  return ''
+}
+
 /** Senet numarası bazlı grup tipi */
 interface ReceiptGroup {
   receiptNo: number | null
@@ -89,6 +141,7 @@ export default function CourierDeliveredPage(): React.JSX.Element {
 
   // Tekrar yazdırma
   const [printData, setPrintData] = useState<DeliveredReceiptInfo[] | null>(null)
+  const [printing, setPrinting] = useState(false)
 
   // Açık/kapalı senet grupları
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -109,19 +162,12 @@ export default function CourierDeliveredPage(): React.JSX.Element {
 
     const result: number[] = []
 
+    /** Rekürsif olarak seçilen birlik + tüm alt birlikleri toplar (ara dahil) */
     function collectDescendants(parentId: number): void {
+      result.push(parentId)
       const children = units.filter((u) => u.parent_id === parentId && u.is_active)
-      if (children.length > 0) {
-        children.forEach((c) => {
-          const grandChildren = units.filter((u) => u.parent_id === c.id && u.is_active)
-          if (grandChildren.length > 0) {
-            collectDescendants(c.id)
-          } else {
-            result.push(c.id)
-          }
-        })
-      } else {
-        result.push(parentId)
+      for (const c of children) {
+        collectDescendants(c.id)
       }
     }
 
@@ -136,19 +182,44 @@ export default function CourierDeliveredPage(): React.JSX.Element {
     if (!dateFrom || !dateTo) return
     setLoading(true)
     try {
-      const res = await incomingDocumentApi.courierDeliveredList({
+      const filters = {
         date_from: dateFrom,
         date_to: dateTo,
         unit_ids: resolvedUnitIds.length > 0 ? resolvedUnitIds : undefined
-      })
-      if (res.success) {
-        setDeliveredList(res.data)
-      } else {
-        showError(res.message)
-        setDeliveredList([])
       }
+
+      const results = await Promise.allSettled([
+        incomingDocumentApi.courierDeliveredList(filters),
+        outgoingDocumentApi.courierDeliveredList(filters),
+        transitDocumentApi.courierDeliveredList(filters)
+      ])
+
+      let allDelivered: DeliveredReceiptInfo[] = []
+      let hasError = false
+
+      results.forEach((res) => {
+        if (res.status === 'fulfilled' && res.value.success) {
+          allDelivered = [...allDelivered, ...res.value.data]
+        } else {
+          hasError = true
+        }
+      })
+
+      if (hasError) {
+        showError('Bazı kapsam verileri yüklenirken hata oluştu')
+      }
+
+      // Senet no ve document_id'ye göre sırala (hepsi birleşik)
+      allDelivered.sort((a, b) => {
+        if (a.receipt_no !== b.receipt_no) {
+          return (b.receipt_no || 0) - (a.receipt_no || 0)
+        }
+        return (a.document_id || 0) - (b.document_id || 0)
+      })
+
+      setDeliveredList(allDelivered)
     } catch {
-      showError('Veriler yüklenirken hata oluştu')
+      showError('Veriler birleştirilirken hata oluştu')
       setDeliveredList([])
     } finally {
       setLoading(false)
@@ -221,17 +292,24 @@ export default function CourierDeliveredPage(): React.JSX.Element {
         height: '100%',
         minHeight: 0,
         overflow: 'hidden',
-        gap: 'var(--mantine-spacing-sm)'
+        gap: 'var(--mantine-spacing-sm)',
+        position: 'relative'
       }}
     >
+      {/* PDF oluşturulurken sayfa seviyesinde loading */}
+      <LoadingOverlay
+        visible={printing}
+        zIndex={1000}
+        overlayProps={{ blur: 2 }}
+        loaderProps={{ type: 'bars', color: 'teal' }}
+      />
       {/* Başlık */}
       <Stack gap={4}>
         <Title order={3} style={{ margin: 0 }}>
           Teslim Edilen
         </Title>
         <Text size="sm" c="dimmed">
-          Kurye kanalıyla teslim edilmiş evrakları senet numarası bazlı listeleyin ve tekrar
-          yazdırın.
+          {PAGE_DESCRIPTION}
         </Text>
       </Stack>
 
@@ -388,6 +466,7 @@ export default function CourierDeliveredPage(): React.JSX.Element {
                           onClick={(e) => {
                             e.stopPropagation()
                             setPrintData(group.items)
+                            setPrinting(true)
                           }}
                           title="Bu senete ait tüm belgeleri yazdır"
                         >
@@ -435,6 +514,7 @@ export default function CourierDeliveredPage(): React.JSX.Element {
                             <Table.Thead>
                               <Table.Tr>
                                 <Table.Th style={{ width: 55 }}>K.NO</Table.Th>
+                                <Table.Th style={{ width: 80 }}>KAPSAM</Table.Th>
                                 <Table.Th>GÖNDEREN MAKAM</Table.Th>
                                 <Table.Th>SAYISI</Table.Th>
                                 <Table.Th style={{ minWidth: 140 }}>KONUSU</Table.Th>
@@ -448,6 +528,29 @@ export default function CourierDeliveredPage(): React.JSX.Element {
                               {group.items.map((d) => (
                                 <Table.Tr key={d.distribution_id}>
                                   <Table.Td fw={600}>{d.document_id}</Table.Td>
+                                  <Table.Td>
+                                    <Badge
+                                      color={
+                                        d.document_scope === 'INCOMING'
+                                          ? 'blue'
+                                          : d.document_scope === 'OUTGOING'
+                                            ? 'orange'
+                                            : d.document_scope === 'TRANSIT'
+                                              ? 'grape'
+                                              : 'gray'
+                                      }
+                                      variant="light"
+                                      size="xs"
+                                    >
+                                      {d.document_scope === 'INCOMING'
+                                        ? 'GELEN'
+                                        : d.document_scope === 'OUTGOING'
+                                          ? 'GİDEN'
+                                          : d.document_scope === 'TRANSIT'
+                                            ? 'TRANSİT'
+                                            : d.document_scope}
+                                    </Badge>
+                                  </Table.Td>
                                   <Table.Td>{d.source_office}</Table.Td>
                                   <Table.Td>{d.reference_number}</Table.Td>
                                   <Table.Td>{d.subject}</Table.Td>
@@ -474,12 +577,16 @@ export default function CourierDeliveredPage(): React.JSX.Element {
         </Box>
       </Card>
 
-      {/* Senet yazdırma */}
+      {/* Senet yazdırma (gizli portal) */}
       {printData && (
         <ReceiptPrintView
           data={printData}
           classifications={classifications}
-          onClose={() => setPrintData(null)}
+          targetUnitName={resolveReceiptUnitName(printData, units)}
+          onClose={() => {
+            setPrintData(null)
+            setPrinting(false)
+          }}
         />
       )}
     </Box>

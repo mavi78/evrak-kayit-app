@@ -300,6 +300,122 @@ export const incomingDocumentApi = {
     invoke<DeliveredReceiptInfo[]>('incoming-document:courier-delivered-list', data)
 }
 
+export const outgoingDocumentApi = {
+  list: (
+    filters: SearchIncomingDocumentsRequest
+  ): Promise<ServiceResponse<PaginatedIncomingDocumentsResponse>> =>
+    invoke<PaginatedIncomingDocumentsResponse>('outgoing-document:list', filters),
+  nextRecordInfo: (): Promise<ServiceResponse<NextRecordInfoResponse>> =>
+    invoke<NextRecordInfoResponse>('outgoing-document:next-record-info'),
+  getById: (id: number): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('outgoing-document:get-by-id', { id }),
+  create: (data: CreateIncomingDocumentRequest): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('outgoing-document:create', data),
+  update: (data: UpdateIncomingDocumentRequest): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('outgoing-document:update', data),
+  delete: (id: number): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('outgoing-document:delete', { id }),
+  getDistributions: (
+    documentId: number,
+    documentScope: DocumentScope
+  ): Promise<ServiceResponse<DocumentDistribution[]>> =>
+    invoke<DocumentDistribution[]>('outgoing-document:get-distributions', {
+      document_id: documentId,
+      document_scope: documentScope
+    }),
+  addDistribution: (
+    data: CreateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution>> =>
+    invoke<DocumentDistribution>('outgoing-document:add-distribution', data),
+  updateDistribution: (
+    data: UpdateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> =>
+    invoke<DocumentDistribution | null>('outgoing-document:update-distribution', data),
+  deleteDistribution: (
+    id: number,
+    forcePostalDelete?: boolean
+  ): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('outgoing-document:delete-distribution', {
+      id,
+      force_postal_delete: forcePostalDelete
+    }),
+  deliverDistribution: (
+    data: DeliverDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> =>
+    invoke<DocumentDistribution | null>('outgoing-document:deliver-distribution', data),
+
+  courierPending: (unitIds: number[]): Promise<ServiceResponse<CourierPendingDistribution[]>> =>
+    invoke<CourierPendingDistribution[]>('outgoing-document:courier-pending', {
+      unit_ids: unitIds
+    }),
+
+  courierBulkDeliver: (data: BulkDeliverRequest): Promise<ServiceResponse<BulkDeliverResponse>> =>
+    invoke<BulkDeliverResponse>('outgoing-document:courier-bulk-deliver', data),
+
+  courierDeliveredList: (
+    data: CourierDeliveredListRequest
+  ): Promise<ServiceResponse<DeliveredReceiptInfo[]>> =>
+    invoke<DeliveredReceiptInfo[]>('outgoing-document:courier-delivered-list', data)
+}
+
+export const transitDocumentApi = {
+  list: (
+    filters: SearchIncomingDocumentsRequest
+  ): Promise<ServiceResponse<PaginatedIncomingDocumentsResponse>> =>
+    invoke<PaginatedIncomingDocumentsResponse>('transit-document:list', filters),
+  nextRecordInfo: (): Promise<ServiceResponse<NextRecordInfoResponse>> =>
+    invoke<NextRecordInfoResponse>('transit-document:next-record-info'),
+  getById: (id: number): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('transit-document:get-by-id', { id }),
+  create: (data: CreateIncomingDocumentRequest): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('transit-document:create', data),
+  update: (data: UpdateIncomingDocumentRequest): Promise<ServiceResponse<IncomingDocument>> =>
+    invoke<IncomingDocument>('transit-document:update', data),
+  delete: (id: number): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('transit-document:delete', { id }),
+  getDistributions: (
+    documentId: number,
+    documentScope: DocumentScope
+  ): Promise<ServiceResponse<DocumentDistribution[]>> =>
+    invoke<DocumentDistribution[]>('transit-document:get-distributions', {
+      document_id: documentId,
+      document_scope: documentScope
+    }),
+  addDistribution: (
+    data: CreateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution>> =>
+    invoke<DocumentDistribution>('transit-document:add-distribution', data),
+  updateDistribution: (
+    data: UpdateDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> =>
+    invoke<DocumentDistribution | null>('transit-document:update-distribution', data),
+  deleteDistribution: (
+    id: number,
+    forcePostalDelete?: boolean
+  ): Promise<ServiceResponse<boolean>> =>
+    invoke<boolean>('transit-document:delete-distribution', {
+      id,
+      force_postal_delete: forcePostalDelete
+    }),
+  deliverDistribution: (
+    data: DeliverDistributionRequest
+  ): Promise<ServiceResponse<DocumentDistribution | null>> =>
+    invoke<DocumentDistribution | null>('transit-document:deliver-distribution', data),
+
+  courierPending: (unitIds: number[]): Promise<ServiceResponse<CourierPendingDistribution[]>> =>
+    invoke<CourierPendingDistribution[]>('transit-document:courier-pending', {
+      unit_ids: unitIds
+    }),
+
+  courierBulkDeliver: (data: BulkDeliverRequest): Promise<ServiceResponse<BulkDeliverResponse>> =>
+    invoke<BulkDeliverResponse>('transit-document:courier-bulk-deliver', data),
+
+  courierDeliveredList: (
+    data: CourierDeliveredListRequest
+  ): Promise<ServiceResponse<DeliveredReceiptInfo[]>> =>
+    invoke<DeliveredReceiptInfo[]>('transit-document:courier-delivered-list', data)
+}
+
 // ============================================================
 // UYGULAMA AYARLARI API
 // ============================================================
@@ -356,4 +472,12 @@ export const postalEnvelopeApi = {
   /** Zarf güncelleme (alıcı adı + RR Kod + pullar) */
   updateEnvelope: (data: UpdatePostalEnvelopeRequest): Promise<ServiceResponse<PostalEnvelope>> =>
     invoke<PostalEnvelope>('postal-envelope:update-envelope', data)
+}
+
+// ============================================================
+// PRINT API — PDF yazdırma (Electron printToPDF)
+// ============================================================
+export const printApi = {
+  /** Aktif pencereden PDF oluşturup açar (sayfa numaralı footer ile) */
+  printReceiptPdf: (): Promise<ServiceResponse<string>> => invoke<string>('app:print-receipt-pdf')
 }

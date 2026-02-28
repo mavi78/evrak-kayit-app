@@ -50,7 +50,9 @@ export class IncomingDocumentRepository extends BaseRepository<IncomingDocument>
   /** Sonraki kayıt numarası — id (AUTOINCREMENT) tabanlı */
   getNextId(): number {
     return this.safeExecute(() => {
-      const stmt = this.db.prepare(`SELECT COALESCE(MAX(id), 0) + 1 AS next_no FROM ${TABLE_NAME}`)
+      const stmt = this.db.prepare(
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_no FROM ${this.getTableName()}`
+      )
       const row = stmt.get() as { next_no: number }
       return row.next_no
     })
@@ -61,7 +63,7 @@ export class IncomingDocumentRepository extends BaseRepository<IncomingDocument>
     return this.safeExecute(() => {
       // created_at'in tarih kısmı (DATE(created_at)) ile karşılaştır
       const stmt = this.db.prepare(
-        `SELECT COALESCE(MAX(day_sequence_no), 0) + 1 AS next_no FROM ${TABLE_NAME} WHERE DATE(created_at) = ?`
+        `SELECT COALESCE(MAX(day_sequence_no), 0) + 1 AS next_no FROM ${this.getTableName()} WHERE DATE(created_at) = ?`
       )
       const row = stmt.get(recordDate) as { next_no: number } | undefined
       return row?.next_no ?? 1
@@ -80,7 +82,7 @@ export class IncomingDocumentRepository extends BaseRepository<IncomingDocument>
     return this.safeTransaction(() => {
       // Transaction içinde atomik gün sıra numarası üretimi
       const daySeqStmt = this.db.prepare(
-        `SELECT COALESCE(MAX(day_sequence_no), 0) + 1 AS next_no FROM ${TABLE_NAME} WHERE DATE(created_at) = ?`
+        `SELECT COALESCE(MAX(day_sequence_no), 0) + 1 AS next_no FROM ${this.getTableName()} WHERE DATE(created_at) = ?`
       )
       const daySequenceNo =
         (daySeqStmt.get(todayDate) as { next_no: number } | undefined)?.next_no ?? 1
@@ -95,7 +97,7 @@ export class IncomingDocumentRepository extends BaseRepository<IncomingDocument>
       const placeholders = keys.map(() => '?').join(', ')
 
       const insertStmt = this.db.prepare(
-        `INSERT INTO ${TABLE_NAME} (${keys.join(', ')}) VALUES (${placeholders})`
+        `INSERT INTO ${this.getTableName()} (${keys.join(', ')}) VALUES (${placeholders})`
       )
       const result = insertStmt.run(...values)
       return this.findById(result.lastInsertRowid as number) as IncomingDocument
@@ -149,12 +151,12 @@ export class IncomingDocumentRepository extends BaseRepository<IncomingDocument>
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
       const countStmt = this.db.prepare(
-        `SELECT COUNT(*) AS total FROM ${TABLE_NAME} ${whereClause}`
+        `SELECT COUNT(*) AS total FROM ${this.getTableName()} ${whereClause}`
       )
       const { total } = countStmt.get(...params) as { total: number }
 
       const dataStmt = this.db.prepare(
-        `SELECT * FROM ${TABLE_NAME} ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`
+        `SELECT * FROM ${this.getTableName()} ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`
       )
       const rows = dataStmt.all(...params, limit, offset) as Record<string, unknown>[]
       return {

@@ -13,7 +13,8 @@ import {
   Tooltip,
   UnstyledButton,
   Menu,
-  useMantineTheme
+  useMantineTheme,
+  ScrollArea
 } from '@mantine/core'
 import {
   IconDashboard,
@@ -337,9 +338,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps): R
 
       <Divider color="gray.2" mb="sm" />
 
-      <Stack gap={2} px="xs" style={{ flex: 1 }}>
-        {visibleRoutes.map(renderMenuItem)}
-      </Stack>
+      <ScrollArea style={{ flex: 1 }} type="hover" scrollbars="y">
+        <Stack gap={2} px="xs">
+          {visibleRoutes.map(renderMenuItem)}
+        </Stack>
+      </ScrollArea>
 
       <Box px={collapsed ? 'xs' : 'md'} mt="auto" pt="sm">
         <Divider color="gray.2" mb="sm" />

@@ -1,5 +1,5 @@
 // ============================================================
-// IncomingDocumentsPage - Gelen evrak listesi
+// OutgoingDocumentsPage - Gelen evrak listesi
 // Üst: sayfa başlığı + açıklama
 // Arama kartı: arama + Yeni Evrak butonu (label yok)
 // GELEN EVRAK LİSTESİ kartı: tablo
@@ -20,10 +20,10 @@ import {
   useDocumentContextMenu
 } from '@renderer/components/common'
 import { useDocumentSearch } from '@renderer/hooks/useDocumentSearch'
-import { incomingDocumentApi, classificationApi, unitApi, channelApi } from '@renderer/lib/api'
+import { outgoingDocumentApi, classificationApi, unitApi, channelApi } from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
 import { useConfirmModal } from '@renderer/hooks/useConfirmModal'
-import { getIncomingDocumentColumns } from './incomingDocumentColumns'
+import { getIncomingDocumentColumns } from './outgoingDocumentColumns'
 import type {
   IncomingDocument,
   DocumentDistribution,
@@ -37,7 +37,7 @@ const PAGE_DESCRIPTION =
   'Satıra tıklayarak dağıtım bilgilerini, çift tıklayarak düzenleme formunu, ' +
   'sağ tıklayarak havale/dağıtım işlemlerini başlatabilirsiniz.'
 
-export default function IncomingDocumentsPage(): React.JSX.Element {
+export default function OutgoingDocumentsPage(): React.JSX.Element {
   const [list, setList] = useState<IncomingDocument[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -85,7 +85,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
     }): Promise<void> => {
       try {
         if (!params.silent) setLoading(true)
-        const res = await incomingDocumentApi.list(params)
+        const res = await outgoingDocumentApi.list(params)
         if (res.success && res.data) {
           setList(res.data.data)
           setTotal(res.data.total)
@@ -136,7 +136,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   )
 
   const loadDistributions = useCallback(async (docId: number): Promise<void> => {
-    const res = await incomingDocumentApi.getDistributions(docId, 'INCOMING')
+    const res = await outgoingDocumentApi.getDistributions(docId, 'OUTGOING')
     if (res.success) setDistributions(res.data)
     else setDistributions([])
   }, [])
@@ -145,7 +145,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
   const handleDistChannelChange = useCallback(
     async (distributionId: number, newChannelId: number): Promise<void> => {
       try {
-        const res = await incomingDocumentApi.updateDistribution({
+        const res = await outgoingDocumentApi.updateDistribution({
           id: distributionId,
           channel_id: newChannelId
         })
@@ -196,7 +196,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
           if (!ok) return
         }
 
-        const res = await incomingDocumentApi.deleteDistribution(dist.id, isPostal)
+        const res = await outgoingDocumentApi.deleteDistribution(dist.id, isPostal)
 
         // Backend posta uyarısı döndüyse (frontend isPostal kontrolünden geçmemiş olabilir)
         if (!res.success && res.message === 'POSTAL_ENVELOPE_WARNING') {
@@ -210,7 +210,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
             color: 'orange'
           })
           if (!ok) return
-          const retryRes = await incomingDocumentApi.deleteDistribution(dist.id, true)
+          const retryRes = await outgoingDocumentApi.deleteDistribution(dist.id, true)
           if (retryRes.success) {
             showSuccess('Dağıtım silindi')
             if (selectedDoc) void loadDistributions(selectedDoc.id)
@@ -456,7 +456,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
           setEditingDoc(null)
         }}
         onSuccess={handleFormSuccess}
-        scope="INCOMING"
+        scope="OUTGOING"
         editingDocument={editingDoc}
       />
 
@@ -475,7 +475,7 @@ export default function IncomingDocumentsPage(): React.JSX.Element {
         opened={distModalOpened}
         onClose={closeDistModal}
         documentId={selectedDoc?.id ?? null}
-        documentScope="INCOMING"
+        documentScope="OUTGOING"
         units={units}
         channels={channels}
         onDistributionsChange={() => {

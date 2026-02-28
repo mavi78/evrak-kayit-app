@@ -32,10 +32,23 @@ import type { UserRole } from '@shared/types'
 /** Menüdeki sayfa anahtarı -> görünen etiket (routes ile senkron) */
 const MENU_PAGE_LABELS: Record<string, string> = {
   dashboard: 'Ana Sayfa',
+  'incoming-documents': 'Gelen Evraklar',
+  'outgoing-documents': 'Giden Evraklar',
+  'transit-documents': 'Transit Evraklar',
   'user-management': 'Kullanıcı Yönetimi',
   'page-management': 'Sayfa Yönetimi',
-  'courier-delivered': 'Kurye - Teslim edilen',
-  'courier-not-delivered': 'Kurye - Teslim edilmeyen'
+  settings: 'Ayarlar',
+  'settings-units': 'Birlik Ayarları',
+  'settings-classifications': 'Gizlilik Ayarları',
+  'settings-channels': 'Kanal Ayarları',
+  'settings-folders': 'Klasör Ayarları',
+  'settings-categories': 'Kategori Ayarları',
+  logs: 'Sistem Logları',
+  'courier-delivered': 'Teslim Edilen Evrak/Mesajlar',
+  'courier-not-delivered': 'Teslim Edilmeyen Evrak/Mesajlar',
+  'settings-app-general': 'Genel Ayarlar',
+  'settings-postal-stamps': 'Posta Pul Ayarları',
+  'postal-service': 'Posta Hizmetleri'
 }
 
 type RoleForDefaults = 'superadmin' | 'admin' | 'user'

@@ -96,8 +96,15 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
   /**
    * Kurye kanalıyla teslim edilmemiş dağıtımlar — evrak detaylarıyla birlikte.
    * Birlik ID listesine göre filtreler: unit_id veya parent_unit_id eşleşmesi.
+   * @param unitIds Birlik ID listesi
+   * @param scope Evrak kapsamı (INCOMING, OUTGOING, TRANSIT)
+   * @param docTableName Evrak tablosu adı (incoming_documents, outgoing_documents, transit_documents)
    */
-  findPendingCourierByUnitIds(unitIds: number[]): CourierPendingDistribution[] {
+  findPendingCourierByUnitIds(
+    unitIds: number[],
+    scope: string,
+    docTableName: string
+  ): CourierPendingDistribution[] {
     if (unitIds.length === 0) return []
     return this.safeExecute(() => {
       const placeholders = unitIds.map(() => '?').join(', ')
@@ -121,15 +128,15 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
           doc.attachment_count,
           doc.page_count
         FROM ${TABLE_NAME} d
-        INNER JOIN incoming_documents doc ON d.document_id = doc.id
+        INNER JOIN ${docTableName} doc ON d.document_id = doc.id
         INNER JOIN channels ch ON d.channel_id = ch.id
         WHERE d.is_delivered = 0
-          AND d.document_scope = 'INCOMING'
+          AND d.document_scope = ?
           AND LOWER(ch.name) = 'kurye'
           AND (d.unit_id IN (${placeholders}) OR d.parent_unit_id IN (${placeholders}))
         ORDER BY doc.id DESC
       `
-      const params = [...unitIds, ...unitIds]
+      const params = [scope, ...unitIds, ...unitIds]
       const rows = this.db.prepare(sql).all(...params) as CourierPendingDistribution[]
       return rows
     })
@@ -141,14 +148,18 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
    * @param dateFrom Başlangıç tarihi (YYYY-MM-DD)
    * @param dateTo Bitiş tarihi (YYYY-MM-DD)
    * @param unitIds Opsiyonel birlik ID filtresi
+   * @param scope Evrak kapsamı (INCOMING, OUTGOING, TRANSIT)
+   * @param docTableName Evrak tablosu adı (incoming_documents, vb.)
    */
   findDeliveredCourier(
     dateFrom: string,
     dateTo: string,
-    unitIds?: number[]
+    unitIds: number[] | undefined,
+    scope: string,
+    docTableName: string
   ): DeliveredReceiptInfo[] {
     return this.safeExecute(() => {
-      const params: (string | number)[] = []
+      const params: (string | number)[] = [scope] // scope için parametre
 
       let unitFilter = ''
       if (unitIds && unitIds.length > 0) {
@@ -166,6 +177,8 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
           d.receipt_no,
           d.delivery_date,
           d.document_id,
+          d.document_scope,
+          d.unit_id,
           doc.record_date,
           doc.source_office,
           doc.reference_number,
@@ -179,11 +192,11 @@ export class DistributionRepository extends BaseRepository<DocumentDistribution>
           doc.page_count,
           d.delivered_by_name
         FROM ${TABLE_NAME} d
-        INNER JOIN incoming_documents doc ON d.document_id = doc.id
+        INNER JOIN ${docTableName} doc ON d.document_id = doc.id
         INNER JOIN channels ch ON d.channel_id = ch.id
         LEFT JOIN units u ON d.unit_id = u.id
         WHERE d.is_delivered = 1
-          AND d.document_scope = 'INCOMING'
+          AND d.document_scope = ?
           AND LOWER(ch.name) = 'kurye'
           ${unitFilter}
           AND DATE(d.delivery_date) >= ?

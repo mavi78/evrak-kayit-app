@@ -22,8 +22,8 @@ export interface DistributionTableProps {
   channels: Channel[]
   /** Kanal değişikliği callback'i — teslim edilmemiş satırlarda çağrılır */
   onChannelChange?: (distributionId: number, newChannelId: number) => void
-  /** Dağıtım silme callback'i — forcePostalDelete: posta zarfına bağlıysa onaylanmış demek */
-  onDeleteDistribution?: (distributionId: number, forcePostalDelete?: boolean) => void
+  /** Dağıtım silme callback'i — distribution nesnesini alır */
+  onDeleteDistribution?: (dist: DocumentDistribution) => void
 }
 
 /** Sağ tık menü state */
@@ -58,12 +58,19 @@ export function DistributionTable({
     return c?.name ?? String(channelId)
   }
 
+  const isPostalChannel = (channelId: number): boolean => {
+    const c = channels.find((x) => x.id === channelId)
+    return c?.name?.toLowerCase() === 'posta'
+  }
+
+  const isCourierChannel = (channelId: number): boolean => {
+    const c = channels.find((x) => x.id === channelId)
+    return c?.name?.toLowerCase() === 'kurye'
+  }
+
   /** Dağıtım kanalı kilitli mi (Kurye/Posta — teslim edildiyse değiştirilemez) */
   const isLockedChannel = (channelId: number): boolean => {
-    const c = channels.find((x) => x.id === channelId)
-    if (!c) return false
-    const locked = ['posta', 'kurye']
-    return locked.includes(c.name.toLowerCase())
+    return isPostalChannel(channelId) || isCourierChannel(channelId)
   }
 
   /** Kanal değiştirme engelli mi? (Kurye/Posta + teslim edilmiş) */
@@ -87,9 +94,7 @@ export function DistributionTable({
 
   const handleDelete = (): void => {
     if (!ctxMenu || !onDeleteDistribution) return
-    const dist = ctxMenu.distribution
-    const isPostal = isLockedChannel(dist.channel_id) && dist.is_delivered
-    onDeleteDistribution(dist.id, isPostal)
+    onDeleteDistribution(ctxMenu.distribution)
     setCtxMenu(null)
   }
 
@@ -261,7 +266,7 @@ export function DistributionTable({
             <>
               <Divider my={4} />
               {ctxMenu?.distribution.is_delivered &&
-              isLockedChannel(ctxMenu.distribution.channel_id) ? (
+              isPostalChannel(ctxMenu.distribution.channel_id) ? (
                 <Menu.Item
                   leftSection={
                     <IconAlertTriangle size={16} color="var(--mantine-color-orange-6)" />
@@ -272,6 +277,19 @@ export function DistributionTable({
                   onClick={handleDelete}
                 >
                   Sil (Posta zarfından çıkarılacak)
+                </Menu.Item>
+              ) : ctxMenu?.distribution.is_delivered &&
+                isCourierChannel(ctxMenu.distribution.channel_id) ? (
+                <Menu.Item
+                  leftSection={
+                    <IconAlertTriangle size={16} color="var(--mantine-color-orange-6)" />
+                  }
+                  fz="sm"
+                  py={8}
+                  c="orange.7"
+                  onClick={handleDelete}
+                >
+                  {`Sil (${ctxMenu.distribution.receipt_no ? `${ctxMenu.distribution.receipt_no} numaralı ` : ''}senetten çıkarılacak)`}
                 </Menu.Item>
               ) : (
                 <Menu.Item

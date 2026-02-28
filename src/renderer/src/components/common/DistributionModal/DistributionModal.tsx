@@ -35,7 +35,7 @@ import {
   IconArrowsLeftRight,
   IconCheck
 } from '@tabler/icons-react'
-import { incomingDocumentApi } from '@renderer/lib/api'
+import { incomingDocumentApi, outgoingDocumentApi, transitDocumentApi } from '@renderer/lib/api'
 import { useConfirmModal } from '@renderer/hooks/useConfirmModal'
 import type { DocumentDistribution, DocumentScope, Unit, Channel } from '@shared/types'
 import { UnitTreePicker } from '@renderer/components/common'
@@ -49,6 +49,13 @@ export interface DistributionModalProps {
   channels: Channel[]
   onDistributionsChange?: () => void
 }
+
+/** Scope → API eşleme */
+const SCOPE_API = {
+  INCOMING: incomingDocumentApi,
+  OUTGOING: outgoingDocumentApi,
+  TRANSIT: transitDocumentApi
+} as const
 
 function useDraggable(): {
   position: { x: number; y: number }
@@ -164,7 +171,7 @@ export function DistributionModal({
     if (!documentId) return
     setLoading(true)
     try {
-      const res = await incomingDocumentApi.getDistributions(documentId, documentScope)
+      const res = await SCOPE_API[documentScope].getDistributions(documentId, documentScope)
       if (res.success) setDistributions(res.data)
       else setDistributions([])
     } finally {
@@ -208,7 +215,7 @@ export function DistributionModal({
           continue
         }
 
-        const res = await incomingDocumentApi.addDistribution({
+        const res = await SCOPE_API[documentScope].addDistribution({
           document_id: documentId,
           document_scope: documentScope,
           unit_id: unitId,
@@ -285,7 +292,7 @@ export function DistributionModal({
         if (!ok) return
       }
 
-      const res = await incomingDocumentApi.deleteDistribution(dist.id, isPostal || undefined)
+      const res = await SCOPE_API[documentScope].deleteDistribution(dist.id, isPostal || undefined)
 
       // Backend posta uyarısı döndüyse
       if (!res.success && res.message === 'POSTAL_ENVELOPE_WARNING') {
@@ -299,7 +306,7 @@ export function DistributionModal({
           color: 'orange'
         })
         if (!ok) return
-        const retryRes = await incomingDocumentApi.deleteDistribution(dist.id, true)
+        const retryRes = await SCOPE_API[documentScope].deleteDistribution(dist.id, true)
         if (retryRes.success) {
           notifications.show({ title: 'Başarılı', message: 'Dağıtım kaldırıldı', color: 'teal' })
           void loadDistributions()
@@ -326,7 +333,7 @@ export function DistributionModal({
         })
       }
     },
-    [loadDistributions, onDistributionsChange, channels, confirm]
+    [loadDistributions, onDistributionsChange, channels, confirm, documentScope]
   )
 
   // Select verileri

@@ -42,12 +42,12 @@ import type { ServiceHandlerMap } from '@main/core/types'
 
 export class IncomingDocumentService extends BaseService<IncomingDocument> {
   protected repository: IncomingDocumentRepository
-  private distributionRepository: DistributionRepository
-  private receiptCounterRepository: ReceiptCounterRepository
-  private classificationRepository: ClassificationRepository
-  private channelRepository: ChannelRepository
-  private unitRepository: UnitRepository
-  private postalEnvelopeRepository: PostalEnvelopeRepository
+  protected distributionRepository: DistributionRepository
+  protected receiptCounterRepository: ReceiptCounterRepository
+  protected classificationRepository: ClassificationRepository
+  protected channelRepository: ChannelRepository
+  protected unitRepository: UnitRepository
+  protected postalEnvelopeRepository: PostalEnvelopeRepository
 
   constructor() {
     super()
@@ -66,6 +66,10 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
 
   getChannelPrefix(): string {
     return 'incoming-document'
+  }
+
+  protected getDocumentScope(): DocumentScope {
+    return 'INCOMING'
   }
 
   protected override async handleCreate(data: unknown): Promise<ServiceResponse<unknown>> {
@@ -189,7 +193,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
   }
 
   /** Modal açılınca: sıradaki K.No (id), bugünün tarihi, G.S.No */
-  private async handleNextRecordInfo(): Promise<ServiceResponse<NextRecordInfoResponse>> {
+  protected async handleNextRecordInfo(): Promise<ServiceResponse<NextRecordInfoResponse>> {
     const nextId = this.repository.getNextId()
     const now = new Date()
     const day = String(now.getDate()).padStart(2, '0')
@@ -201,7 +205,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     return this.ok({ nextId, recordDate, daySequenceNo }, 'Kayıt bilgileri hazır')
   }
 
-  private async handleList(
+  protected async handleList(
     filters: SearchIncomingDocumentsRequest
   ): Promise<ServiceResponse<PaginatedIncomingDocumentsResponse>> {
     const page = Math.max(1, filters.page ?? 1)
@@ -222,7 +226,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
 
   // ---- Dağıtım İşlemleri ----
 
-  private async handleGetDistributions(
+  protected async handleGetDistributions(
     data: unknown
   ): Promise<ServiceResponse<DocumentDistribution[]>> {
     const { document_id, document_scope } = data as {
@@ -235,7 +239,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     return this.ok(list, 'Dağıtımlar getirildi')
   }
 
-  private async handleAddDistribution(
+  protected async handleAddDistribution(
     data: CreateDistributionRequest
   ): Promise<ServiceResponse<DocumentDistribution>> {
     const { document_id, document_scope, unit_id, channel_id } = data
@@ -244,10 +248,10 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     if (!unit_id) throw AppError.badRequest('Birlik seçimi zorunludur')
     if (!channel_id) throw AppError.badRequest('Kanal seçimi zorunludur')
 
-    // Scope'a göre evrak varlık kontrolü (şimdilik sadece INCOMING)
-    if (document_scope === 'INCOMING') {
+    // Scope'a göre evrak varlık kontrolü (Sınıfın kendi scope'u ile validate edelim)
+    if (document_scope === this.getDocumentScope()) {
       if (!this.repository.exists(document_id)) {
-        throw AppError.notFound('Gelen evrak kaydı bulunamadı')
+        throw AppError.notFound('Evrak kaydı bulunamadı')
       }
     }
 
@@ -284,7 +288,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     return this.created(item, 'Dağıtım eklendi')
   }
 
-  private async handleUpdateDistribution(
+  protected async handleUpdateDistribution(
     data: UpdateDistributionRequest
   ): Promise<ServiceResponse<DocumentDistribution | null>> {
     const { id, ...rest } = data
@@ -349,7 +353,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     return this.ok(item, 'Dağıtım güncellendi')
   }
 
-  private async handleDeleteDistribution(data: unknown): Promise<ServiceResponse<boolean>> {
+  protected async handleDeleteDistribution(data: unknown): Promise<ServiceResponse<boolean>> {
     const input = data as { id: number; force_postal_delete?: boolean }
     const id = input.id
     if (!id) throw AppError.badRequest('Silinecek dağıtım ID belirtilmedi')
@@ -381,7 +385,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
   }
 
   /** Teslim işlemi — kanalın is_senet_required değerine göre senet no üretimi */
-  private async handleDeliverDistribution(
+  protected async handleDeliverDistribution(
     data: DeliverDistributionRequest
   ): Promise<ServiceResponse<DocumentDistribution | null>> {
     const { id } = data
@@ -423,14 +427,18 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
   // ---- Kurye İşlemleri ----
 
   /** Birlik ID listesine göre teslim edilmemiş kurye dağıtımlarını getir */
-  private async handleCourierPending(
+  protected async handleCourierPending(
     data: unknown
   ): Promise<ServiceResponse<CourierPendingDistribution[]>> {
     const { unit_ids } = data as { unit_ids: number[] }
     if (!unit_ids || !Array.isArray(unit_ids) || unit_ids.length === 0) {
       throw AppError.badRequest('En az bir birlik ID belirtilmelidir')
     }
-    const list = this.distributionRepository.findPendingCourierByUnitIds(unit_ids)
+    const list = this.distributionRepository.findPendingCourierByUnitIds(
+      unit_ids,
+      this.getDocumentScope(),
+      this.repository['getTableName']() // protected metoda class içinden erişim
+    )
     return this.ok(
       list,
       list.length > 0
@@ -440,7 +448,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
   }
 
   /** Seçilen dağıtım ID'lerini toplu teslim et */
-  private async handleCourierBulkDeliver(
+  protected async handleCourierBulkDeliver(
     data: BulkDeliverRequest
   ): Promise<ServiceResponse<BulkDeliverResponse>> {
     const { distribution_ids, delivered_by_user_id, delivered_by_name } = data
@@ -515,6 +523,8 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
           receipt_no: sharedReceiptNo,
           delivery_date: deliveryDate,
           document_id: existing.document_id,
+          document_scope: existing.document_scope,
+          unit_id: existing.unit_id,
           record_date: doc?.record_date ?? '',
           source_office: doc?.source_office ?? '',
           reference_number: doc?.reference_number ?? '',
@@ -539,7 +549,7 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
   }
 
   /** Teslim edilmiş kurye dağıtımlarını getir (filtreleme destekli) */
-  private async handleCourierDeliveredList(
+  protected async handleCourierDeliveredList(
     data: CourierDeliveredListRequest
   ): Promise<ServiceResponse<DeliveredReceiptInfo[]>> {
     const { date_from, date_to, unit_ids } = data
@@ -549,7 +559,9 @@ export class IncomingDocumentService extends BaseService<IncomingDocument> {
     const list = this.distributionRepository.findDeliveredCourier(
       date_from,
       date_to,
-      unit_ids && unit_ids.length > 0 ? unit_ids : undefined
+      unit_ids && unit_ids.length > 0 ? unit_ids : undefined,
+      this.getDocumentScope(),
+      this.repository['getTableName']()
     )
     return this.ok(
       list,

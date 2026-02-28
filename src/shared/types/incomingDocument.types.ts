@@ -181,6 +181,9 @@ export interface DeliveredReceiptInfo {
   receipt_no: number | null
   delivery_date: string
   document_id: number
+  document_scope: DocumentScope
+  /** Dağıtımın yapıldığı birlik ID */
+  unit_id: number
   /** Belgenin kayıt tarihi (YYYY-MM-DD) */
   record_date: string
   source_office: string

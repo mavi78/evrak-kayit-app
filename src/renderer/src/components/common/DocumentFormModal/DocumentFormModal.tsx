@@ -24,7 +24,9 @@ import {
   classificationApi,
   categoryApi,
   folderApi,
-  incomingDocumentApi
+  incomingDocumentApi,
+  outgoingDocumentApi,
+  transitDocumentApi
 } from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
 import { useConfirmModal } from '@renderer/hooks/useConfirmModal'
@@ -70,6 +72,13 @@ const SCOPE_TITLES: Record<DocumentScope, string> = {
   OUTGOING: 'Yeni Giden Evrak',
   TRANSIT: 'Yeni Transit Evrak'
 }
+
+/** Scope → API eşleme */
+const SCOPE_API = {
+  INCOMING: incomingDocumentApi,
+  OUTGOING: outgoingDocumentApi,
+  TRANSIT: transitDocumentApi
+} as const
 
 /** Form başlangıç durumu */
 interface FormState {
@@ -320,9 +329,11 @@ export function DocumentFormModal({
     // Gerçek tarihi (ISO formatlı) hesapla
     const isoDate = convertDocumentDateToIso(form.documentDateInput.trim())
 
+    const api = SCOPE_API[scope]
+
     if (isEditMode && editingDocument) {
       // Güncelleme
-      res = await incomingDocumentApi.update({
+      res = await api.update({
         id: editingDocument.id,
         channel_id: Number(form.channelId),
         source_office: form.sourceOffice.trim(),
@@ -353,7 +364,7 @@ export function DocumentFormModal({
         category_id: Number(form.categoryId),
         folder_id: Number(form.folderId)
       }
-      res = await incomingDocumentApi.create(payload)
+      res = await api.create(payload)
     }
 
     setSaving(false)

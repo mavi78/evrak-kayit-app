@@ -24,12 +24,19 @@ import {
   Badge,
   ScrollArea,
   Modal,
+  LoadingOverlay,
   useMantineTheme
 } from '@mantine/core'
 import { IconPrinter, IconCheck, IconAlertTriangle } from '@tabler/icons-react'
 import { useAuth } from '@renderer/hooks/useAuth'
 import { UnitTreePicker } from '@renderer/components/common'
-import { incomingDocumentApi, unitApi, classificationApi } from '@renderer/lib/api'
+import {
+  incomingDocumentApi,
+  outgoingDocumentApi,
+  transitDocumentApi,
+  unitApi,
+  classificationApi
+} from '@renderer/lib/api'
 import { showError, showSuccess } from '@renderer/lib/notifications'
 import { ReceiptPrintView } from '@renderer/components/common/ReceiptPrintView/ReceiptPrintView'
 import type {
@@ -37,11 +44,13 @@ import type {
   Classification,
   CourierPendingDistribution,
   DeliveredReceiptInfo,
-  BulkDeliverResponse
+  BulkDeliverResponse,
+  DocumentScope,
+  ServiceResponse
 } from '@shared/types'
 
 const PAGE_DESCRIPTION =
-  'Kurye kanalıyla dağıtılmış ve henüz teslim edilmemiş belgeleri birlik bazlı listeleyebilir, ' +
+  'Gelen, Giden ve Transit evraklara ait olup henüz teslim edilmemiş kurye belgelerini birlik bazlı listeleyebilir, ' +
   'toplu veya tekli seçimle teslim edebilir ve senet yazdırabilirsiniz.'
 
 /** Tarih formatlama: YYYY-MM-DD → DD.MM.YYYY */
@@ -78,6 +87,7 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
 
   // Senet yazdırma
   const [printData, setPrintData] = useState<DeliveredReceiptInfo[] | null>(null)
+  const [printing, setPrinting] = useState(false)
 
   // Çakışma modalı state'leri
   const [conflictModalOpen, setConflictModalOpen] = useState(false)
@@ -102,22 +112,12 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
 
     const result: number[] = []
 
-    /** Rekürsif olarak tüm alt birlikleri toplar */
+    /** Rekürsif olarak seçilen birlik + tüm alt birlikleri toplar (ara dahil) */
     function collectDescendants(parentId: number): void {
+      result.push(parentId)
       const children = units.filter((u) => u.parent_id === parentId && u.is_active)
-      if (children.length > 0) {
-        children.forEach((c) => {
-          // Alt birliğin de altı var mı bak — rekürsif
-          const grandChildren = units.filter((u) => u.parent_id === c.id && u.is_active)
-          if (grandChildren.length > 0) {
-            collectDescendants(c.id)
-          } else {
-            result.push(c.id)
-          }
-        })
-      } else {
-        // Alt birlik yoksa birliğin kendisini ekle
-        result.push(parentId)
+      for (const c of children) {
+        collectDescendants(c.id)
       }
     }
 
@@ -142,20 +142,35 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     setHasSearched(true)
     setSelectedDistIds(new Set())
 
-    incomingDocumentApi
-      .courierPending(resolvedUnitIds)
-      .then((res) => {
+    Promise.allSettled([
+      incomingDocumentApi.courierPending(resolvedUnitIds),
+      outgoingDocumentApi.courierPending(resolvedUnitIds),
+      transitDocumentApi.courierPending(resolvedUnitIds)
+    ])
+      .then((results) => {
         if (cancelled) return
-        if (res.success) {
-          setPendingList(res.data)
-        } else {
-          showError(res.message)
-          setPendingList([])
+
+        let allPending: CourierPendingDistribution[] = []
+        let hasError = false
+
+        results.forEach((res) => {
+          if (res.status === 'fulfilled' && res.value.success) {
+            allPending = [...allPending, ...res.value.data]
+          } else {
+            hasError = true
+          }
+        })
+
+        if (hasError) {
+          showError('Bazı veriler yüklenirken hata oluştu')
         }
+
+        // Sıralama (tarih/id vb. eklenebilir, şimdilik olduğu gibi bırakıyoruz)
+        setPendingList(allPending)
       })
       .catch(() => {
         if (cancelled) return
-        showError('Veri yüklenirken bir hata oluştu')
+        showError('Veri yüklenirken bir genel hata oluştu')
         setPendingList([])
       })
       .finally(() => {
@@ -193,18 +208,30 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     if (resolvedUnitIds.length === 0) return
     setLoading(true)
     setSelectedDistIds(new Set())
-    incomingDocumentApi
-      .courierPending(resolvedUnitIds)
-      .then((res) => {
-        if (res.success) {
-          setPendingList(res.data)
-        } else {
-          showError(res.message)
-          setPendingList([])
+    Promise.allSettled([
+      incomingDocumentApi.courierPending(resolvedUnitIds),
+      outgoingDocumentApi.courierPending(resolvedUnitIds),
+      transitDocumentApi.courierPending(resolvedUnitIds)
+    ])
+      .then((results) => {
+        let allPending: CourierPendingDistribution[] = []
+        let hasError = false
+
+        results.forEach((res) => {
+          if (res.status === 'fulfilled' && res.value.success) {
+            allPending = [...allPending, ...res.value.data]
+          } else {
+            hasError = true
+          }
+        })
+
+        if (hasError) {
+          showError('Bazı veriler yüklenirken hata oluştu')
         }
+        setPendingList(allPending)
       })
       .catch(() => {
-        showError('Veri yüklenirken bir hata oluştu')
+        showError('Veri yüklenirken bir genel hata oluştu')
         setPendingList([])
       })
       .finally(() => setLoading(false))
@@ -222,63 +249,107 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     }
     setDelivering(true)
     try {
-      const res = await incomingDocumentApi.courierBulkDeliver({
-        distribution_ids: Array.from(selectedDistIds),
-        delivered_by_user_id: authState.user.id,
-        delivered_by_name: authState.user.full_name
-      })
-      if (res.success && res.data) {
-        const { delivered, failed } = res.data
+      // Seçili dağıtımları scope'lara göre grupla
+      const selectedDistributions = pendingList.filter((d) =>
+        selectedDistIds.has(d.distribution_id)
+      )
+      const groupedByScope = selectedDistributions.reduce(
+        (acc, curr) => {
+          if (!acc[curr.document_scope]) acc[curr.document_scope] = []
+          acc[curr.document_scope].push(curr.distribution_id)
+          return acc
+        },
+        {} as Record<DocumentScope, number[]>
+      )
 
-        // Sadece "Zaten teslim edilmiş" çakışma kayıtlarını filtrele
-        const conflicts = failed.filter((f) => f.already_delivered_by)
+      const promises: Promise<ServiceResponse<BulkDeliverResponse>>[] = []
 
-        if (delivered.length === 0 && conflicts.length > 0) {
-          // Senaryo A: Tümü zaten teslim edilmiş
-          showError(
-            'Seçtiğiniz tüm evraklar başka bir kullanıcı tarafından zaten teslim edilmiş. Sayfa yenileniyor...'
-          )
-          refreshList()
-        } else if (delivered.length > 0 && conflicts.length > 0) {
-          // Senaryo B: Kısmen teslim edilmiş — çakışma uyarı modalı
-          setConflictData({ delivered, failed: conflicts })
-          setConflictModalOpen(true)
-          // Teslim edilen dağıtımları listeden çıkar (henüz yazdırma yok — modal sonucuna göre)
+      if (groupedByScope['INCOMING']?.length) {
+        promises.push(
+          incomingDocumentApi.courierBulkDeliver({
+            distribution_ids: groupedByScope['INCOMING'],
+            delivered_by_user_id: authState.user.id,
+            delivered_by_name: authState.user.full_name
+          })
+        )
+      }
+      if (groupedByScope['OUTGOING']?.length) {
+        promises.push(
+          outgoingDocumentApi.courierBulkDeliver({
+            distribution_ids: groupedByScope['OUTGOING'],
+            delivered_by_user_id: authState.user.id,
+            delivered_by_name: authState.user.full_name
+          })
+        )
+      }
+      if (groupedByScope['TRANSIT']?.length) {
+        promises.push(
+          transitDocumentApi.courierBulkDeliver({
+            distribution_ids: groupedByScope['TRANSIT'],
+            delivered_by_user_id: authState.user.id,
+            delivered_by_name: authState.user.full_name
+          })
+        )
+      }
+
+      const results = await Promise.allSettled(promises)
+
+      let allDelivered: DeliveredReceiptInfo[] = []
+      let allFailed: BulkDeliverResponse['failed'] = []
+      let errorOccurred = false
+
+      for (const res of results) {
+        if (res.status === 'fulfilled' && res.value.success && res.value.data) {
+          allDelivered = [...allDelivered, ...res.value.data.delivered]
+          allFailed = [...allFailed, ...res.value.data.failed]
+        } else {
+          errorOccurred = true
+        }
+      }
+
+      const conflicts = allFailed.filter((f) => f.already_delivered_by)
+
+      if (allDelivered.length === 0 && conflicts.length > 0) {
+        showError(
+          'Seçtiğiniz tüm evraklar başka bir kullanıcı tarafından zaten teslim edilmiş. Sayfa yenileniyor...'
+        )
+        refreshList()
+      } else if (allDelivered.length > 0 && conflicts.length > 0) {
+        setConflictData({ delivered: allDelivered, failed: conflicts })
+        setConflictModalOpen(true)
+        setPendingList((prev) =>
+          prev.filter((d) => !allDelivered.some((del) => del.distribution_id === d.distribution_id))
+        )
+        setSelectedDistIds(new Set())
+      } else {
+        if (allDelivered.length > 0) {
+          showSuccess(`${allDelivered.length} evrak teslim edildi`)
+          setPrintData(allDelivered)
+          setPrinting(true)
           setPendingList((prev) =>
-            prev.filter((d) => !delivered.some((del) => del.distribution_id === d.distribution_id))
+            prev.filter(
+              (d) => !allDelivered.some((del) => del.distribution_id === d.distribution_id)
+            )
           )
           setSelectedDistIds(new Set())
-        } else {
-          // Senaryo C: Çakışma yok — mevcut davranış
-          if (delivered.length > 0) {
-            showSuccess(`${delivered.length} evrak teslim edildi`)
-            setPrintData(delivered)
-            setPendingList((prev) =>
-              prev.filter(
-                (d) => !delivered.some((del) => del.distribution_id === d.distribution_id)
-              )
-            )
-            setSelectedDistIds(new Set())
-          }
-          if (failed.length > 0) {
-            showError(`${failed.length} evrak teslim edilemedi`)
-          }
         }
-      } else {
-        showError(res.message)
+        if (allFailed.length > 0 || errorOccurred) {
+          showError(`${allFailed.length} evrak teslim edilemedi veya işlem sırasında hata oluştu`)
+        }
       }
     } catch {
       showError('Teslim işlemi sırasında bir hata oluştu')
     } finally {
       setDelivering(false)
     }
-  }, [selectedDistIds, authState.user, refreshList])
+  }, [selectedDistIds, authState.user, refreshList, pendingList])
 
   // Çakışma modalı: Kabul Et
   const handleConflictAccept = useCallback(() => {
     if (conflictData) {
       showSuccess(`${conflictData.delivered.length} evrak teslim edildi`)
       setPrintData(conflictData.delivered)
+      setPrinting(true)
       // Çakışan dağıtımları da listeden çıkar
       const conflictDistIds = new Set(conflictData.failed.map((f) => f.distribution_id))
       setPendingList((prev) => prev.filter((d) => !conflictDistIds.has(d.distribution_id)))
@@ -304,6 +375,35 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
     [classifications]
   )
 
+  const getScopeBadge = (scope: DocumentScope): React.JSX.Element => {
+    switch (scope) {
+      case 'INCOMING':
+        return (
+          <Badge color="blue" variant="light" size="xs">
+            GELEN
+          </Badge>
+        )
+      case 'OUTGOING':
+        return (
+          <Badge color="orange" variant="light" size="xs">
+            GİDEN
+          </Badge>
+        )
+      case 'TRANSIT':
+        return (
+          <Badge color="grape" variant="light" size="xs">
+            TRANSİT
+          </Badge>
+        )
+      default:
+        return (
+          <Badge color="gray" variant="light" size="xs">
+            {scope}
+          </Badge>
+        )
+    }
+  }
+
   return (
     <Box
       style={{
@@ -312,9 +412,17 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
         height: '100%',
         minHeight: 0,
         overflow: 'hidden',
-        gap: 'var(--mantine-spacing-sm)'
+        gap: 'var(--mantine-spacing-sm)',
+        position: 'relative'
       }}
     >
+      {/* PDF oluşturulurken sayfa seviyesinde loading */}
+      <LoadingOverlay
+        visible={printing}
+        zIndex={1000}
+        overlayProps={{ blur: 2 }}
+        loaderProps={{ type: 'bars', color: 'teal' }}
+      />
       {/* Başlık */}
       <Stack gap={4}>
         <Title order={3} style={{ margin: 0 }}>
@@ -447,6 +555,7 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
                       />
                     </Table.Th>
                     <Table.Th style={{ width: 60 }}>K.NO</Table.Th>
+                    <Table.Th style={{ width: 80 }}>KAPSAM</Table.Th>
                     <Table.Th>GÖNDEREN MAKAM</Table.Th>
                     <Table.Th>SAYISI</Table.Th>
                     <Table.Th style={{ minWidth: 180 }}>KONUSU</Table.Th>
@@ -503,7 +612,7 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
                         {showGroupHeaders && (
                           <Table.Tr>
                             <Table.Td
-                              colSpan={9}
+                              colSpan={10}
                               style={{
                                 background: theme.colors.deniz[0],
                                 padding: '6px 8px',
@@ -554,6 +663,7 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
                                 />
                               </Table.Td>
                               <Table.Td fw={600}>{d.document_id}</Table.Td>
+                              <Table.Td>{getScopeBadge(d.document_scope)}</Table.Td>
                               <Table.Td>{d.source_office}</Table.Td>
                               <Table.Td>{d.reference_number}</Table.Td>
                               <Table.Td>{d.subject}</Table.Td>
@@ -591,12 +701,22 @@ export default function CourierNotDeliveredPage(): React.JSX.Element {
         )}
       </Card>
 
-      {/* Senet yazdırma modal */}
+      {/* Senet yazdırma (gizli portal) */}
       {printData && (
         <ReceiptPrintView
           data={printData}
           classifications={classifications}
-          onClose={() => setPrintData(null)}
+          targetUnitName={
+            selectedUnitIds[0]
+              ? units.find((u) => u.id === selectedUnitIds[0])?.short_name ||
+                units.find((u) => u.id === selectedUnitIds[0])?.name ||
+                ''
+              : ''
+          }
+          onClose={() => {
+            setPrintData(null)
+            setPrinting(false)
+          }}
         />
       )}
 

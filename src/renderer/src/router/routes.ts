@@ -45,6 +45,12 @@ const CategoriesPage = lazy(() => import('@renderer/pages/settings/categories/Ca
 const IncomingDocumentsPage = lazy(
   () => import('@renderer/pages/incoming-documents/IncomingDocumentsPage')
 )
+const OutgoingDocumentsPage = lazy(
+  () => import('@renderer/pages/outgoing-documents/OutgoingDocumentsPage')
+)
+const TransitDocumentsPage = lazy(
+  () => import('@renderer/pages/transit-documents/TransitDocumentsPage')
+)
 const AppSettingsPage = lazy(() => import('@renderer/pages/settings/app-general/AppSettingsPage'))
 const PostalStampsPage = lazy(
   () => import('@renderer/pages/settings/postal-stamps/PostalStampsPage')
@@ -91,6 +97,24 @@ export const routes: RouteConfig[] = [
     pageKey: 'incoming-documents',
     showInSidebar: true,
     label: 'Gelen Evrak',
+    minimumRole: 'user',
+    requiresPermission: true
+  },
+  {
+    path: '/outgoing-documents',
+    component: OutgoingDocumentsPage,
+    pageKey: 'outgoing-documents',
+    showInSidebar: true,
+    label: 'Giden Evrak',
+    minimumRole: 'user',
+    requiresPermission: true
+  },
+  {
+    path: '/transit-documents',
+    component: TransitDocumentsPage,
+    pageKey: 'transit-documents',
+    showInSidebar: true,
+    label: 'Transit Evrak',
     minimumRole: 'user',
     requiresPermission: true
   },
