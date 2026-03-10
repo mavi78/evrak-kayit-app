@@ -6,56 +6,115 @@ description: Kodlama isteği ön akışı — netleştirme, analiz, plan ve onay
 
 Kodlama isteği geldiğinde (`/prompt-enhancer`) bu akış uygulanır.
 
-**Uygulanmaz:** Genel sorular, git/commit işlemleri, skill/kural düzenleme istekleri.
+**Kapsam dışı:** Genel sorular, git/commit, skill/kural düzenleme, tek satırlık düzeltmeler.
 
 ---
 
-## 1. Netleştirme
+## Adım 1 · Netleştirme (Gerekirse)
 
-- İsteği analiz et: belirsiz noktalar, eksik bilgiler, alternatif yaklaşımlar var mı?
-- Belirsizlik varsa → `notify_user` ile sorular/seçenekler sun, cevap bekle.
-- İstek zaten net ve tek yolu varsa → doğrudan Adım 2'ye geç.
-- **Tüm belirsizlikler giderilmeden ilerlenme.**
+İsteği analiz et:
 
-## 2. Proje Analizi
+1. Belirsiz nokta veya eksik bilgi var mı?
+2. Birden fazla geçerli yaklaşım mevcut mu?
 
-- İstekle ilgili mevcut dosyaları, modülleri ve bileşenleri bul ve oku.
-- Hangi katmanlar etkilenecek? (shared, backend, frontend, IPC)
-- Mevcut kalıp ve konvansiyonları tespit et.
-- **Tahmin etme; dosya okuyarak somut bilgi topla.**
+- **Belirsizlik varsa** → `notify_user` ile kısa ve numaralı sorular sor. Tüm yanıtlar gelene kadar ilerleme.
+- **Net ise** → Adım 2'ye geç.
 
-## 3. Uygulama Planı
+> Amaç: Gereksiz soru sorma. Sadece implementasyonu etkileyecek belirsizlikleri sor.
 
-- `implementation_plan.md` artifact'ini oluştur (Antigravity standart formatında).
-- İçeriğe dahil edilecekler:
-  - Özet (1-2 cümle)
-  - Etkilenen katmanlar ve dosyalar ([NEW], [MODIFY], [DELETE] etiketleriyle)
-  - Adım adım plan (katman bağımlılık sırasına göre: shared → backend → frontend)
-  - Dikkat edilecekler (kısıtlamalar, proje kuralları)
-  - Doğrulama planı
+---
 
-## 4. Onay
+## Adım 2 · Kod Tabanı Analizi
 
-- `notify_user` ile planı kullanıcıya sun ve onay bekle.
-- Onay gelirse → Adım 5'e geç.
-- Değişiklik istenirse → planı revize et, tekrar onay iste.
+Minimum okuma, maksimum bilgi ilkesiyle çalış:
 
-## 5. İmplementasyon
+1. **Etki alanını belirle** — Hangi katmanlar etkilenecek? (shared / backend / frontend / IPC)
+2. **Mevcut dosyaları oku** — Sadece değişecek veya referans alınacak dosyaları oku.
+3. **Pattern tespiti** — Proje genelindeki naming, yapı ve konvansiyon kalıplarını not et.
+4. **İlgili skill(ler)i oku** — Etkilenen katmanın skill dosyasını oku:
+   - Backend → `backend-architecture`
+   - Frontend → `frontend-architecture`
+   - IPC / Shared → `shared-contracts`
 
-- `task.md` ile iş planını checklist olarak oluştur.
-- Her adımda ilgili skill'i oku (`backend-architecture`, `frontend-architecture`, `shared-contracts`).
-- Katman bağımlılık sırasını koru: shared → backend → frontend.
+> **Kural:** Tahmin etme, dosya okuyarak somut bilgi topla. Gereksiz dosya okumaktan kaçın.
+
+---
+
+## Adım 3 · Implementation Plan
+
+`implementation_plan.md` artifact'ini oluştur. Aşağıdaki yapıyı kullan:
+
+### Plan Yapısı
+
+```markdown
+# [Kısa Hedef Başlığı]
+
+Bağlam ve değişikliğin ne sağlayacağı (maks. 2 cümle).
+
+## Kullanıcı Onayı Gereken Noktalar (varsa)
+
+> [!WARNING]
+> Breaking change veya kritik karar açıklaması
+
+## Değişiklikler
+
+### [Katman/Bileşen Adı]
+
+#### [MODIFY|NEW|DELETE] `dosya-adı.ts`
+
+- Yapılacak değişikliğin kısa açıklaması
+- Detay maddeleri (ne eklenecek/değişecek/silinecek)
+
+---
+
+### [Sonraki Katman/Bileşen]
+
+...
+
+## Doğrulama
+
+- [ ] `npm run typecheck` hatasız
+- [ ] `npm run lint` hatasız
+- [ ] [Varsa fonksiyonel doğrulama adımları]
+```
+
+### Plan Yazım Kuralları
+
+| Kural           | Açıklama                                                                                      |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| **Sıralama**    | Katman bağımlılık sırasını takip et: `shared → backend → frontend`                            |
+| **Dosya bazlı** | Her dosya ayrı bir alt başlık. Etiket: `[NEW]`, `[MODIFY]`, `[DELETE]`                        |
+| **Kısa yaz**    | Açıklama satırları kısa bullet point'ler olmalı, paragraf yazma                               |
+| **Somut ol**    | "Gerekli değişiklikler yapılacak" gibi muğlak ifadeler kullanma; neyin nasıl değişeceğini yaz |
+| **Kod snippet** | Plan içinde kod snippet'i kullanma, sadece yapılacak işi tarif et                             |
+| **Scope aşma**  | İstekle ilgisiz iyileştirme/refactoring ekleme                                                |
+
+---
+
+## Adım 4 · Onay
+
+- `notify_user` ile planı sun → `BlockedOnUser: true`, `ShouldAutoProceed: true`
+- ✅ Onay → Adım 5
+- 🔄 Revizyon → Planı güncelle, tekrar onay iste
+
+---
+
+## Adım 5 · İmplementasyon
+
+1. `task.md` checklist'i oluştur (plan maddelerini `[ ]` formatına çevir).
+2. Katman bağımlılık sırasıyla ilerle: `shared → backend → frontend`.
+3. Her dosya değişikliğinde ilgili skill'e uy.
 
 // turbo
-5a. `npm run typecheck` — Tip hatası kontrolü
+5a. `npm run typecheck`
 
 // turbo
-5b. `npm run lint` — Lint kontrolü
+5b. `npm run lint`
 
-Hata varsa düzelt ve tekrar çalıştır. Hatasız geçene kadar tamamlanmış sayılmaz.
+Hata varsa düzelt ve tekrar çalıştır. Her ikisi de hatasız geçmeden tamamlanmış sayılmaz.
 
 ---
 
 ## Dil Kuralı
 
-- Kullanıcı ile **Türkçe** konuşulur. Kod içi isimler İngilizce kalır.
+- Kullanıcıyla **Türkçe** konuş. Kod içi isimler **İngilizce** kalır.

@@ -348,6 +348,66 @@ function registerWindowControlHandlers(): void {
           page-break-inside: avoid !important;
           break-inside: avoid !important;
         }
+        
+        /* Teslim Tarihi ve Teslim Alan bölümü varsayılan sıfırlama */
+        .receipt-footer * {
+          margin: 0 !important;
+          padding: 0 !important;
+          font-family: 'Times New Roman', Times, serif !important;
+          font-size: 13px !important;
+          color: #000 !important;
+          line-height: 1.2 !important;
+        }
+
+        /* Teslim Tarihi ve Teslim Alan bölümü layout kuralları */
+        .receipt-footer {
+          display: flex !important;
+          flex-direction: row !important;
+          justify-content: center !important;
+          gap: 80px !important;
+          align-items: flex-start !important;
+          margin-top: 24px !important;
+          padding-left: 24px !important;
+          padding-right: 24px !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        .receipt-delivery-info, .receipt-receiver-info {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 2px !important;
+          align-items: flex-start !important;
+        }
+        .receipt-receiver-info {
+          min-width: 200px !important;
+        }
+        .receipt-info-row {
+          display: flex !important;
+          flex-direction: row !important;
+          gap: 4px !important;
+          align-items: baseline !important;
+          white-space: nowrap !important;
+        }
+        
+        /* Font weight and specific layout fixes */
+        .receipt-info-row * {
+          font-weight: 600 !important;
+        }
+        .receipt-delivery-info .receipt-info-row > :first-child {
+          font-weight: 700 !important;
+          width: auto !important;
+          min-width: 110px !important;
+          white-space: nowrap !important;
+        }
+        .receipt-receiver-info .receipt-info-row > :first-child {
+          width: 50px !important;
+        }
+        .receipt-receiver-info > :first-child {
+          font-weight: 700 !important;
+          text-decoration: underline !important;
+          margin-bottom: 6px !important;
+          display: block !important;
+        }
       `
 
       // CSS'i gizli pencereye enjekte et

@@ -272,6 +272,7 @@ export function ReceiptPrintView({
 
         {/* Alt Bilgiler: Teslim Tarihi / İmza Blokları */}
         <Group
+          className="receipt-footer"
           justify="center"
           gap={80}
           align="flex-start"
@@ -279,8 +280,8 @@ export function ReceiptPrintView({
           px="xl"
           style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
         >
-          <Stack gap={4} align="flex-start">
-            <Group gap="xs">
+          <Stack className="receipt-delivery-info" gap={4} align="flex-start">
+            <Group className="receipt-info-row" gap="xs">
               <Text fw={700} size="sm" style={{ width: 100 }}>
                 TESLİM TARİHİ
               </Text>
@@ -288,7 +289,7 @@ export function ReceiptPrintView({
                 : {deliveryDateStr}
               </Text>
             </Group>
-            <Group gap="xs">
+            <Group className="receipt-info-row" gap="xs">
               <Text fw={700} size="sm" style={{ width: 100 }}>
                 TESLİM SAATİ
               </Text>
@@ -298,11 +299,16 @@ export function ReceiptPrintView({
             </Group>
           </Stack>
 
-          <Stack gap={4} align="flex-start" style={{ minWidth: 200 }}>
+          <Stack
+            className="receipt-receiver-info"
+            gap={4}
+            align="flex-start"
+            style={{ minWidth: 200 }}
+          >
             <Text fw={700} size="sm" mb={4} style={{ textDecoration: 'underline' }}>
               TESLİM ALAN
             </Text>
-            <Group gap="xs">
+            <Group className="receipt-info-row" gap="xs">
               <Text fw={600} size="sm" style={{ width: 50 }}>
                 İmza
               </Text>
@@ -310,7 +316,7 @@ export function ReceiptPrintView({
                 :
               </Text>
             </Group>
-            <Group gap="xs">
+            <Group className="receipt-info-row" gap="xs">
               <Text fw={600} size="sm" style={{ width: 50 }}>
                 Adı
               </Text>
@@ -318,7 +324,7 @@ export function ReceiptPrintView({
                 :
               </Text>
             </Group>
-            <Group gap="xs">
+            <Group className="receipt-info-row" gap="xs">
               <Text fw={600} size="sm" style={{ width: 50 }}>
                 Soyadı
               </Text>
@@ -326,7 +332,7 @@ export function ReceiptPrintView({
                 :
               </Text>
             </Group>
-            <Group gap="xs">
+            <Group className="receipt-info-row" gap="xs">
               <Text fw={600} size="sm" style={{ width: 50 }}>
                 Rütbesi
               </Text>
